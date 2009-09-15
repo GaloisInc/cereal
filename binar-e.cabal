@@ -41,7 +41,9 @@ library
                    Data.BinarE.Builder
 
   extensions:      CPP,
-                   FlexibleContexts
+                   FlexibleContexts,
+                   Rank2Types,
+                   MagicHash
 
   ghc-options:     -O2 -Wall -fliberate-case-threshold=1000
 
