@@ -1,10 +1,11 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Binary.Put
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Lennart Kolmodin <kolmodin@dtek.chalmers.se>
+-- Maintainer  : Galois, Inc.
 -- Stability   : stable
 -- Portability : Portable to Hugs and GHC. Requires MPTCs
 --
@@ -12,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Binary.Put (
+module Data.BinarE.Put (
 
     -- * The Put type
       Put
@@ -49,8 +50,8 @@ module Data.Binary.Put (
   ) where
 
 import Data.Monoid
-import Data.Binary.Builder (Builder, toLazyByteString)
-import qualified Data.Binary.Builder as B
+import Data.BinarE.Builder (Builder, toLazyByteString)
+import qualified Data.BinarE.Builder as B
 
 import Data.Word
 import qualified Data.ByteString      as S

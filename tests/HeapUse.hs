@@ -1,6 +1,6 @@
 -- Checks heap behavior of getBytes
 
-import Data.Binary.Get (runGet, getBytes)
+import Data.BinarE.Get (runGet, getBytes)
 
 import Control.Monad (liftM)
 import qualified Data.ByteString.Lazy as L

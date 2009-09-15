@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary
+-- Module      : Data.BinarE
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -25,7 +25,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Binary (
+module Data.BinarE (
 
     -- * The Binary class
       Binary(..)
@@ -58,8 +58,8 @@ module Data.Binary (
 
 import Data.Word
 
-import Data.Binary.Put
-import Data.Binary.Get
+import Data.BinarE.Put
+import Data.BinarE.Get
 
 import Control.Monad
 import Foreign
@@ -232,7 +232,7 @@ encode = runPut . put
 
 -- | Decode a value from a lazy ByteString, reconstructing the original structure.
 --
-decode :: Binary a => ByteString -> a
+decode :: Binary a => ByteString -> Either String a
 decode = runGet get
 
 ------------------------------------------------------------------------
@@ -267,7 +267,7 @@ encodeFile f v = L.writeFile f (encode v)
 -- it is up to the decoding instance to consume the rest of the data,
 -- or otherwise finalise the resource.
 --
-decodeFile :: Binary a => FilePath -> IO a
+decodeFile :: Binary a => FilePath -> IO (Either String a)
 decodeFile f = do
     s <- L.readFile f
     return $ runGet (do v <- get

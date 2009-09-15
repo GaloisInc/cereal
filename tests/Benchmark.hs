@@ -2,9 +2,9 @@
 module Main (main) where
 
 import qualified Data.ByteString.Lazy as L
-import Data.Binary
-import Data.Binary.Put
-import Data.Binary.Get
+import Data.BinarE
+import Data.BinarE.Put
+import Data.BinarE.Get
 
 import Control.Exception
 import System.CPUTime

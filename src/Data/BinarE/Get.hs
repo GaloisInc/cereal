@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE CPP       #-}
+{-# LANGUAGE MagicHash #-}
 -- for unboxed shifts
 
 -----------------------------------------------------------------------------
@@ -8,7 +8,7 @@
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Lennart Kolmodin <kolmodin@dtek.chalmers.se>
+-- Maintainer  : Galois, Inc.
 -- Stability   : experimental
 -- Portability : portable to Hugs and GHC.
 --
@@ -21,7 +21,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.Binary.Get (
+module Data.BinarE.Get (
 
     -- * The Get type
       Get
@@ -105,12 +105,13 @@ data S = S {-# UNPACK #-} !B.ByteString  -- current chunk
            {-# UNPACK #-} !Int64         -- bytes read
 
 -- | The Get monad is just a State monad carrying around the input ByteString
--- We treat it as a strict state monad. 
-newtype Get a = Get { unGet :: S -> (a, S) }
+-- We treat it as a strict state monad.
+newtype Get a = Get { unGet :: S -> Either String (a, S) }
 
 instance Functor Get where
-    fmap f m = Get (\s -> case unGet m s of
-                             (a, s') -> (f a, s'))
+    fmap f m = Get $ \s -> case unGet m s of
+      Left i       -> Left i
+      Right (a,s') -> Right (f a, s')
     {-# INLINE fmap #-}
 
 #ifdef APPLICATIVE_IN_BASE
@@ -121,26 +122,26 @@ instance Applicative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a  = Get (\s -> (a, s))
+    return a  = Get (\s -> Right (a,s))
     {-# INLINE return #-}
 
-    m >>= k   = Get (\s -> let (a, s') = unGet m s
-                           in unGet (k a) s')
+    m >>= f   = Get $ \s -> case unGet m s of
+      Left i       -> Left i
+      Right (a,s') -> unGet (f a) s'
     {-# INLINE (>>=) #-}
 
     fail      = failDesc
 
 instance MonadFix Get where
-    mfix f = Get (\s -> let (a,s') = unGet (f a) s
-                        in (a,s'))
+    mfix f = Get (\s -> let Right (a,s') = unGet (f a) s in Right (a,s'))
 
 ------------------------------------------------------------------------
 
 get :: Get S
-get   = Get (\s -> (s, s))
+get   = Get (\s -> Right (s, s))
 
 put :: S -> Get ()
-put s = Get (\_ -> ((), s))
+put s = Get (\_ -> Right ((), s))
 
 ------------------------------------------------------------------------
 --
@@ -176,23 +177,27 @@ mkState (B.LPS xs) =
 #endif
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
-runGet :: Get a -> L.ByteString -> a
-runGet m str = case unGet m (initState str) of (a, _) -> a
+runGet :: Get a -> L.ByteString -> Either String a
+runGet m str = case unGet m (initState str) of
+  Left  i      -> Left i
+  Right (a, _) -> Right a
 
 -- | Run the Get monad applies a 'get'-based parser on the input
 -- ByteString. Additional to the result of get it returns the number of
 -- consumed bytes and the rest of the input.
-runGetState :: Get a -> L.ByteString -> Int64 -> (a, L.ByteString, Int64)
+runGetState :: Get a -> L.ByteString -> Int64
+            -> Either String (a, L.ByteString, Int64)
 runGetState m str off =
     case unGet m (mkState str off) of
-      (a, ~(S s ss newOff)) -> (a, s `join` ss, newOff)
+      Left i                      -> Left i
+      Right (a, ~(S s ss newOff)) -> Right (a, s `join` ss, newOff)
 
 ------------------------------------------------------------------------
 
 failDesc :: String -> Get a
 failDesc err = do
     S _ _ bytes <- get
-    Get (error (err ++ ". Failed reading at byte position " ++ show bytes))
+    Get (\_ -> Left (err ++ ". Failed reading at byte position " ++ show bytes))
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()

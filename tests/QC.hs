@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
 module Main where
 
-import Data.Binary
-import Data.Binary.Put
-import Data.Binary.Get
+import Data.BinarE
+import Data.BinarE.Put
+import Data.BinarE.Get
 
-import Parallel
+--import Parallel
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B

@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE CPP       #-}
+{-# LANGUAGE MagicHash #-}
 -- for unboxed shifts
 
 -----------------------------------------------------------------------------
@@ -8,7 +8,7 @@
 -- Copyright   : Lennart Kolmodin, Ross Paterson
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Lennart Kolmodin <kolmodin@dtek.chalmers.se>
+-- Maintainer  : Galois, Inc.
 -- Stability   : experimental
 -- Portability : portable to Hugs and GHC
 --
@@ -20,7 +20,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.Binary.Builder (
+module Data.BinarE.Builder (
 
     -- * The Builder type
       Builder

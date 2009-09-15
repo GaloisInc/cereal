@@ -21,7 +21,7 @@ module Parallel (
 import Test.QuickCheck
 import Data.List
 import Control.Concurrent
-import Control.Exception  hiding (evaluate)
+import Control.Exception
 import System.Random
 import System.IO          (hFlush,stdout)
 import Text.Printf
@@ -76,21 +76,17 @@ pRun n depth tests = do
 
 -- | Wrap a property, and run it on a deterministic set of data
 pDet :: Testable a => a -> Int -> IO String
-pDet a n = mycheck Det defaultConfig
-    { configMaxTest = n
-    , configEvery   = \n args -> unlines args } a
+pDet a n = mycheck Det stdArgs { maxSuccess = n } a
 
 -- | Wrap a property, and run it on a non-deterministic set of data
 pNon :: Testable a => a -> Int -> IO String
-pNon a n = mycheck NonDet defaultConfig
-    { configMaxTest = n
-    , configEvery   = \n args -> unlines args } a
+pNon a n = mycheck NonDet stdArgs { maxSuccess = n } a
 
 data Mode = Det | NonDet
 
 ------------------------------------------------------------------------
 
-mycheck :: Testable a => Mode -> Config -> a -> IO String
+mycheck :: Testable a => Mode -> Args -> a -> IO String
 mycheck Det config a = do
      let rnd = mkStdGen 99  -- deterministic
      mytests config (evaluate a) rnd 0 0 []
@@ -99,10 +95,9 @@ mycheck NonDet config a = do
     rnd <- newStdGen        -- different each run
     mytests config (evaluate a) rnd 0 0 []
 
-mytests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]] -> IO String
+mytests :: Args -> Gen Result -> StdGen -> Int -> Int -> [[String]] -> IO String
 mytests config gen rnd0 ntest nfail stamps
-  | ntest == configMaxTest config = do done "OK," ntest stamps
-  | nfail == configMaxFail config = do done "Arguments exhausted after" ntest stamps
+  | ntest == maxSuccess config = do done "OK," ntest stamps
   | otherwise = do
          case ok result of
            Nothing    ->
