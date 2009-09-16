@@ -276,7 +276,7 @@ getBytes n = do
     S s bytes left <- get
     let off = bytes + n
     when (off > left) (fail ("too few bytes"))
-    let (consume,rest) = B.splitAt off s
+    let (consume,rest) = B.splitAt n s
     put $! S rest off left
     return $! consume
 
