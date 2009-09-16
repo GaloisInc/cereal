@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.BinarE
+-- Module      : Data.Binary.Safe
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -25,7 +25,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.BinarE (
+module Data.Binary.Safe (
 
     -- * The Binary class
       Binary(..)
@@ -58,8 +58,8 @@ module Data.BinarE (
 
 import Data.Word
 
-import Data.BinarE.Put
-import Data.BinarE.Get
+import Data.Binary.Safe.Put
+import Data.Binary.Safe.Get
 
 import Control.Monad
 import Foreign

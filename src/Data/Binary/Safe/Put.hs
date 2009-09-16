@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Put
+-- Module      : Data.Binary.Safe.Put
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.BinarE.Put (
+module Data.Binary.Safe.Put (
 
     -- * The Put type
       Put
@@ -50,8 +50,8 @@ module Data.BinarE.Put (
   ) where
 
 import Data.Monoid
-import Data.BinarE.Builder (Builder, toLazyByteString)
-import qualified Data.BinarE.Builder as B
+import Data.Binary.Safe.Builder (Builder, toLazyByteString)
+import qualified Data.Binary.Safe.Builder as B
 
 import Data.Word
 import qualified Data.ByteString      as S

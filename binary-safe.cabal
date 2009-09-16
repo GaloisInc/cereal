@@ -1,4 +1,4 @@
-name:            binar-e
+name:            binary-safe
 version:         0.1
 license:         BSD3
 license-file:    LICENSE
@@ -35,10 +35,10 @@ library
     build-depends: base < 2.0
   hs-source-dirs:  src
 
-  exposed-modules: Data.BinarE,
-                   Data.BinarE.Put,
-                   Data.BinarE.Get,
-                   Data.BinarE.Builder
+  exposed-modules: Data.Binary.Safe,
+                   Data.Binary.Safe.Put,
+                   Data.Binary.Safe.Get,
+                   Data.Binary.Safe.Builder
 
   extensions:      CPP,
                    FlexibleContexts,

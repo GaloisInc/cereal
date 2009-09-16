@@ -1,11 +1,10 @@
 {-# LANGUAGE CPP        #-}
 {-# LANGUAGE MagicHash  #-}
 {-# LANGUAGE Rank2Types #-}
--- for unboxed shifts
 
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Get
+-- Module      : Data.Binary.Safe.Get
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -22,7 +21,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.BinarE.Get (
+module Data.Binary.Safe.Get (
 
     -- * The Get type
       Get
@@ -30,6 +29,7 @@ module Data.BinarE.Get (
     , runGetState
 
     -- * Parsing
+    , isolate
     , skip
     , uncheckedSkip
     , lookAhead
@@ -48,9 +48,6 @@ module Data.BinarE.Get (
 
     -- ** ByteStrings
     , getByteString
-    , getLazyByteString
-    , getLazyByteStringNul
-    , getRemainingLazyByteString
 
     -- ** Big-endian reads
     , getWord16be
@@ -70,7 +67,7 @@ module Data.BinarE.Get (
 
   ) where
 
-import Control.Monad (when,liftM,ap,MonadPlus(..))
+import Control.Monad (unless,when,ap,MonadPlus(..))
 import Data.Maybe (isNothing)
 
 import qualified Data.ByteString as B
@@ -87,29 +84,26 @@ import Control.Applicative (Applicative(..))
 
 import Foreign
 
--- used by splitAtST
-import Control.Monad.ST
-import Data.STRef
-
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base
 import GHC.Word
-import GHC.Int
 #endif
 
 -- | The parse state
-data S = S {-# UNPACK #-} !B.ByteString  -- current chunk
-           {-# UNPACK #-} !Int         -- bytes read
+data S = S {-# UNPACK #-} !B.ByteString -- input
+           {-# UNPACK #-} !Int          -- bytes read
+           {-# UNPACK #-} !Int          -- bytes available
 
--- | The Get monad is just a State monad carrying around the input ByteString
--- We treat it as a strict state monad.
+type Trace = [(Int,String)]
+
+-- | The Get monad is an Exception and State monad.
 newtype Get a = Get
-  { unGet :: forall r.
-             S -> (S -> a -> Either String (r, S)) -> Either String (r, S) }
+  { unGet :: forall r. Trace -> S
+                    -> (Trace -> S -> a -> Either String (r, S))
+                    -> Either String (r, S) }
 
 instance Functor Get where
-    fmap f m = Get (\s0 k -> unGet m s0 (\s a -> k s (f a)))
-    {-# INLINE fmap #-}
+    fmap f m = Get (\t0 s0 k -> unGet m t0 s0 (\t s a -> k t s (f a)))
 
 
 #ifdef APPLICATIVE_IN_BASE
@@ -120,72 +114,40 @@ instance Applicative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a  = Get (\s0 k -> k s0 a)
-    {-# INLINE return #-}
-
-    m >>= f   = Get (\s0 k -> unGet m s0 (\s a -> unGet (f a) s k))
-    {-# INLINE (>>=) #-}
-
-    fail      = failDesc
+    return a = Get (\t0 s0 k -> k t0 s0 a)
+    m >>= f  = Get (\t0 s0 k -> unGet m t0 s0 (\t s a -> unGet (f a) t s k))
+    fail     = failDesc
 
 instance MonadPlus Get where
-    mzero = Get (\_ _ -> Left "mzero")
+    mzero = Get (\_ _ _ -> Left "mzero")
 
-    mplus a b = Get $ \s0 k -> case unGet a s0 k of
-      Left _    -> unGet b s0 k
+    mplus a b = Get $ \t0 s0 k -> case unGet a t0 s0 k of
+      Left _    -> unGet b t0 s0 k
       Right res -> Right res
 
 ------------------------------------------------------------------------
 
 get :: Get S
-get   = Get (\s0 k -> k s0 s0)
+get  = Get (\t s0 k -> k t s0 s0)
 
 put :: S -> Get ()
-put s = Get (\_ k -> k s ())
+put s = Get (\t _ k -> k t s ())
 
-------------------------------------------------------------------------
---
--- dons, GHC 6.10: explicit inlining disabled, was killing performance.
--- Without it, GHC seems to do just fine. And we get similar
--- performance with 6.8.2 anyway.
---
+label :: String -> Get a -> Get a
+label l m = Get (\t0 s0@(S _ p _) k -> unGet m ((p,l):t0) s0 k)
 
 initState :: B.ByteString -> S
 initState xs = mkState xs 0
-{- INLINE initState -}
 
-{-
-initState (B.LPS xs) =
-    case xs of
-      []      -> S B.empty B.empty 0
-      (x:xs') -> S x (B.LPS xs') 0
--}
-
-#ifndef BYTESTRING_IN_BASE
 mkState :: B.ByteString -> Int -> S
-mkState  = S
-{-
-mkState l = case l of
-    B.Empty      -> S B.empty B.empty
-    B.Chunk x xs -> S x xs
-    -}
-{- INLINE mkState -}
+mkState xs off = S xs off (B.length xs)
 
-#else
-mkState :: B.ByteString -> Int64 -> S
-mkState (B.LPS xs) =
-    case xs of
-        [] -> S B.empty B.empty
-        (x:xs') -> S x (B.LPS xs')
-#endif
-
-finalK :: S -> a -> Either String (a,S)
-finalK s a = Right (a,s)
-
+finalK :: Trace -> S -> a -> Either String (a,S)
+finalK _ s a = Right (a,s)
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
-runGet m str = case unGet m (initState str) finalK of
+runGet m str = case unGet m [] (initState str) finalK of
   Left  i      -> Left i
   Right (a, _) -> Right a
 
@@ -195,28 +157,46 @@ runGet m str = case unGet m (initState str) finalK of
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString, Int)
 runGetState m str off =
-    case unGet m (mkState str off) finalK of
-      Left i                   -> Left i
-      Right (a, ~(S s newOff)) -> Right (a, s, newOff)
+    case unGet m [] (mkState str off) finalK of
+      Left i                     -> Left i
+      Right (a, ~(S s newOff _)) -> Right (a, s, newOff)
 
 ------------------------------------------------------------------------
 
+-- | Isolate an action to operating within a fixed block of bytes.  The action
+--   is required to consume all the bytes that it is isolated to.
+isolate :: String -> Int -> Get a -> Get a
+isolate l n m = label l $ do
+  S s bytes left <- get
+  let boundary = bytes + n
+  unless (boundary <= left) (fail "not enough space left to isolate")
+  put $! S s bytes boundary
+  a             <- m
+  S s' bytes' _ <- get
+  unless (bytes' == boundary) (fail "not all bytes parsed in isolate")
+  put $! S s' boundary left
+  return a
+
 failDesc :: String -> Get a
 failDesc err = do
-    S _ bytes <- get
-    Get (\_ _ -> Left (err ++ ". Failed reading at byte position " ++ show bytes))
+    S _ bytes _  <- get
+    let fmt (p,l) = "\t" ++ show p ++ "\t" ++ l
+    let msg t = concat
+          [ "Failed reading at position ", show bytes
+          , ", ", err, "\nFrom"
+          , unlines (map fmt t) ]
+    Get (\t _ _ -> Left (msg t))
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
-skip n = readN (fromIntegral n) (const ())
+skip n = readN n (const ())
 
 -- | Skip ahead @n@ bytes. No error if there isn't enough bytes.
 uncheckedSkip :: Int -> Get ()
 uncheckedSkip n = do
-    S s bytes <- get
-    if B.length s >= n
-      then put $! S (B.drop (fromIntegral n) s) (bytes + n)
-      else put $! mkState B.empty (bytes + n)
+    S s bytes left <- get
+    let off = min (bytes + n) left
+    put $! S (B.drop n s) off left
 
 -- | Run @ga@, but return without consuming its input.
 -- Fails if @ga@ fails.
@@ -233,8 +213,7 @@ lookAheadM :: Get (Maybe a) -> Get (Maybe a)
 lookAheadM gma = do
     s <- get
     ma <- gma
-    when (isNothing ma) $
-        put s
+    when (isNothing ma) (put s)
     return ma
 
 -- | Like 'lookAhead', but consume the input if @gea@ returns 'Right _'.
@@ -248,10 +227,10 @@ lookAheadE gea = do
         _      -> return ()
     return ea
 
--- | Get the next up to @n@ bytes as a lazy ByteString, without consuming them. 
+-- | Get the next up to @n@ bytes as a ByteString, without consuming them.
 uncheckedLookAhead :: Int -> Get B.ByteString
 uncheckedLookAhead n = do
-    S s _ <- get
+    S s _ _ <- get
     return (B.take n s)
 
 ------------------------------------------------------------------------
@@ -260,7 +239,7 @@ uncheckedLookAhead n = do
 -- | Get the total number of bytes read to this point.
 bytesRead :: Get Int
 bytesRead = do
-    S _ b <- get
+    S _ b _ <- get
     return b
 
 -- | Get the number of remaining unparsed bytes.
@@ -268,15 +247,16 @@ bytesRead = do
 -- Note that this forces the rest of the input.
 remaining :: Get Int
 remaining = do
-    S s _ <- get
-    return (B.length s)
+    S _ _ left <- get
+    return left
 
 -- | Test whether all input has been consumed,
 -- i.e. there are no remaining unparsed bytes.
 isEmpty :: Get Bool
 isEmpty = do
-    S s _ <- get
-    return (B.null s)
+    S _ bytes left <- get
+    return (bytes == left) -- compare bytes and left, so that this works within
+                           -- isolation blocks.
 
 ------------------------------------------------------------------------
 -- Utility with ByteStrings
@@ -285,37 +265,7 @@ isEmpty = do
 -- than @n@ bytes are left in the input.
 getByteString :: Int -> Get B.ByteString
 getByteString n = readN n id
-{-# INLINE getByteString #-}
 
--- | An efficient 'get' method for lazy ByteStrings. Does not fail if fewer than
--- @n@ bytes are left in the input.
-getLazyByteString :: Int -> Get B.ByteString
-getLazyByteString n = do
-    S s bytes <- get
-    case B.splitAt n s of
-      (consume, rest) -> do put $! mkState rest (bytes + n)
-                            return consume
-{-# INLINE getLazyByteString #-}
-
--- | Get a lazy ByteString that is terminated with a NUL byte. Fails
--- if it reaches the end of input without hitting a NUB.
-getLazyByteStringNul :: Get B.ByteString
-getLazyByteStringNul = do
-    S s bytes <- get
-    let (consume, t) = B.break (== 0) s
-        (h, rest) = B.splitAt 1 t
-    if B.null h
-      then fail "too few bytes"
-      else do
-        put $ mkState rest (bytes + B.length consume + 1)
-        return consume
-{-# INLINE getLazyByteStringNul #-}
-
--- | Get the remaining bytes as a lazy ByteString
-getRemainingLazyByteString :: Get B.ByteString
-getRemainingLazyByteString = do
-    S s _ <- get
-    return s
 
 ------------------------------------------------------------------------
 -- Helpers
@@ -323,81 +273,18 @@ getRemainingLazyByteString = do
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
 getBytes n = do
-    S s bytes <- get
-    let (consume,rest) = B.splitAt n s
-    put $! S rest (bytes + fromIntegral n)
+    S s bytes left <- get
+    let off = bytes + n
+    when (off > left) (fail ("too few bytes"))
+    let (consume,rest) = B.splitAt off s
+    put $! S rest off left
     return $! consume
-{- INLINE getBytes -}
--- ^ important
-
-#ifndef BYTESTRING_IN_BASE
-join :: B.ByteString -> B.ByteString -> B.ByteString
-join bb lb
-    | B.null bb = lb
-    | otherwise = B.append bb lb
-
-#else
-join :: B.ByteString -> B.ByteString -> B.ByteString
-join bb (B.LPS lb)
-    | B.null bb = B.LPS lb
-    | otherwise = B.LPS (bb:lb)
-#endif
-    -- don't use B.append, it's strict in it's second argument :/
-{- INLINE join -}
-
--- | Split a ByteString. If the first result is consumed before the --
--- second, this runs in constant heap space.
---
--- You must force the returned tuple for that to work, e.g.
--- 
--- > case splitAtST n xs of
--- >    (ys,zs) -> consume ys ... consume zs
---
-splitAtST :: Int -> B.ByteString -> (B.ByteString, B.ByteString)
-splitAtST i ps = B.splitAt i ps
-{-
-#ifndef BYTESTRING_IN_BASE
-splitAtST i ps          = runST (
-     do r  <- newSTRef undefined
-        xs <- first r i ps
-        ys <- unsafeInterleaveST (readSTRef r)
-        return (xs, ys))
-
-  where
-        first r 0 xs | B.null xs = writeSTRef r B.empty >> return B.empty
-                     | n < l     = do writeSTRef r (B.Chunk (B.drop (fromIntegral n) x) xs)
-                                      return $ B.Chunk (B.take (fromIntegral n) x) B.Empty
-                     | otherwise = do writeSTRef r (B.drop (n - l) xs)
-                                      liftM (B.Chunk x) $ unsafeInterleaveST (first r (n - l) xs)
-
-         where l = fromIntegral (B.length x)
-#else
-splitAtST i (B.LPS ps)  = runST (
-     do r  <- newSTRef undefined
-        xs <- first r i ps
-        ys <- unsafeInterleaveST (readSTRef r)
-        return (B.LPS xs, B.LPS ys))
-
-  where first r 0 xs     = writeSTRef r xs >> return []
-        first r _ []     = writeSTRef r [] >> return []
-        first r n (x:xs)
-          | n < l     = do writeSTRef r (B.drop (fromIntegral n) x : xs)
-                           return [B.take (fromIntegral n) x]
-          | otherwise = do writeSTRef r (B.toChunks (B.drop (n - l) (B.LPS xs)))
-                           fmap (x:) $ unsafeInterleaveST (first r (n - l) xs)
-
-         where l = fromIntegral (B.length x)
-#endif
--}
-{- INLINE splitAtST -}
 
 -- Pull n bytes from the input, and apply a parser to those bytes,
 -- yielding a value. If less than @n@ bytes are available, fail with an
 -- error. This wraps @getBytes@.
 readN :: Int -> (B.ByteString -> a) -> Get a
-readN n f = fmap f $ getBytes n
-{- INLINE readN -}
--- ^ important
+readN n f = f `fmap` getBytes n
 
 ------------------------------------------------------------------------
 -- Primtives
@@ -410,14 +297,12 @@ getPtr :: Storable a => Int -> Get a
 getPtr n = do
     (fp,o,_) <- readN n B.toForeignPtr
     return . B.inlinePerformIO $ withForeignPtr fp $ \p -> peek (castPtr $ p `plusPtr` o)
-{- INLINE getPtr -}
 
 ------------------------------------------------------------------------
 
 -- | Read a Word8 from the monad state
 getWord8 :: Get Word8
 getWord8 = getPtr (sizeOf (undefined :: Word8))
-{- INLINE getWord8 -}
 
 -- | Read a Word16 in big endian format
 getWord16be :: Get Word16
@@ -425,7 +310,6 @@ getWord16be = do
     s <- readN 2 id
     return $! (fromIntegral (s `B.index` 0) `shiftl_w16` 8) .|.
               (fromIntegral (s `B.index` 1))
-{- INLINE getWord16be -}
 
 -- | Read a Word16 in little endian format
 getWord16le :: Get Word16
@@ -433,7 +317,6 @@ getWord16le = do
     s <- readN 2 id
     return $! (fromIntegral (s `B.index` 1) `shiftl_w16` 8) .|.
               (fromIntegral (s `B.index` 0) )
-{- INLINE getWord16le -}
 
 -- | Read a Word32 in big endian format
 getWord32be :: Get Word32
@@ -443,7 +326,6 @@ getWord32be = do
               (fromIntegral (s `B.index` 1) `shiftl_w32` 16) .|.
               (fromIntegral (s `B.index` 2) `shiftl_w32`  8) .|.
               (fromIntegral (s `B.index` 3) )
-{- INLINE getWord32be -}
 
 -- | Read a Word32 in little endian format
 getWord32le :: Get Word32
@@ -453,7 +335,6 @@ getWord32le = do
               (fromIntegral (s `B.index` 2) `shiftl_w32` 16) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w32`  8) .|.
               (fromIntegral (s `B.index` 0) )
-{- INLINE getWord32le -}
 
 -- | Read a Word64 in big endian format
 getWord64be :: Get Word64
@@ -467,7 +348,6 @@ getWord64be = do
               (fromIntegral (s `B.index` 5) `shiftl_w64` 16) .|.
               (fromIntegral (s `B.index` 6) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.index` 7) )
-{-# INLINE getWord64be #-}
 
 -- | Read a Word64 in little endian format
 getWord64le :: Get Word64
@@ -481,7 +361,6 @@ getWord64le = do
               (fromIntegral (s `B.index` 2) `shiftl_w64` 16) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.index` 0) )
-{-# INLINE getWord64le #-}
 
 ------------------------------------------------------------------------
 -- Host-endian reads
@@ -491,22 +370,18 @@ getWord64le = do
 -- machine the Word is an 8 byte value, on a 32 bit machine, 4 bytes.
 getWordhost :: Get Word
 getWordhost = getPtr (sizeOf (undefined :: Word))
-{- INLINE getWordhost -}
 
 -- | /O(1)./ Read a 2 byte Word16 in native host order and host endianness.
 getWord16host :: Get Word16
 getWord16host = getPtr (sizeOf (undefined :: Word16))
-{- INLINE getWord16host -}
 
 -- | /O(1)./ Read a Word32 in native host order and host endianness.
 getWord32host :: Get Word32
 getWord32host = getPtr  (sizeOf (undefined :: Word32))
-{- INLINE getWord32host -}
 
 -- | /O(1)./ Read a Word64 in native host order and host endianess.
 getWord64host   :: Get Word64
 getWord64host = getPtr  (sizeOf (undefined :: Word64))
-{- INLINE getWord64host -}
 
 ------------------------------------------------------------------------
 -- Unchecked shifts

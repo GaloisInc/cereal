@@ -4,7 +4,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Builder
+-- Module      : Data.Binary.Safe.Builder
 -- Copyright   : Lennart Kolmodin, Ross Paterson
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -20,7 +20,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.BinarE.Builder (
+module Data.Binary.Safe.Builder (
 
     -- * The Builder type
       Builder
