@@ -74,13 +74,11 @@ import Control.Monad (when,liftM,ap,MonadPlus(..))
 import Data.Maybe (isNothing)
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as L
 
 #ifdef BYTESTRING_IN_BASE
 import qualified Data.ByteString.Base as B
 #else
 import qualified Data.ByteString.Internal as B
-import qualified Data.ByteString.Lazy.Internal as L
 #endif
 
 #ifdef APPLICATIVE_IN_BASE
@@ -101,8 +99,7 @@ import GHC.Int
 
 -- | The parse state
 data S = S {-# UNPACK #-} !B.ByteString  -- current chunk
-           L.ByteString                  -- the rest of the input
-           {-# UNPACK #-} !Int64         -- bytes read
+           {-# UNPACK #-} !Int         -- bytes read
 
 -- | The Get monad is just a State monad carrying around the input ByteString
 -- We treat it as a strict state monad.
@@ -113,6 +110,7 @@ newtype Get a = Get
 instance Functor Get where
     fmap f m = Get (\s0 k -> unGet m s0 (\s a -> k s (f a)))
     {-# INLINE fmap #-}
+
 
 #ifdef APPLICATIVE_IN_BASE
 instance Applicative Get where
@@ -132,7 +130,6 @@ instance Monad Get where
 
 instance MonadPlus Get where
     mzero = Get (\_ _ -> Left "mzero")
-    {-# INLINE mzero #-}
 
     mplus a b = Get $ \s0 k -> case unGet a s0 k of
       Left _    -> unGet b s0 k
@@ -153,29 +150,32 @@ put s = Get (\_ k -> k s ())
 -- performance with 6.8.2 anyway.
 --
 
-initState :: L.ByteString -> S
+initState :: B.ByteString -> S
 initState xs = mkState xs 0
 {- INLINE initState -}
 
 {-
 initState (B.LPS xs) =
     case xs of
-      []      -> S B.empty L.empty 0
+      []      -> S B.empty B.empty 0
       (x:xs') -> S x (B.LPS xs') 0
 -}
 
 #ifndef BYTESTRING_IN_BASE
-mkState :: L.ByteString -> Int64 -> S
+mkState :: B.ByteString -> Int -> S
+mkState  = S
+{-
 mkState l = case l of
-    L.Empty      -> S B.empty L.empty
-    L.Chunk x xs -> S x xs
+    B.Empty      -> S B.empty B.empty
+    B.Chunk x xs -> S x xs
+    -}
 {- INLINE mkState -}
 
 #else
-mkState :: L.ByteString -> Int64 -> S
+mkState :: B.ByteString -> Int64 -> S
 mkState (B.LPS xs) =
     case xs of
-        [] -> S B.empty L.empty
+        [] -> S B.empty B.empty
         (x:xs') -> S x (B.LPS xs')
 #endif
 
@@ -184,7 +184,7 @@ finalK s a = Right (a,s)
 
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
-runGet :: Get a -> L.ByteString -> Either String a
+runGet :: Get a -> B.ByteString -> Either String a
 runGet m str = case unGet m (initState str) finalK of
   Left  i      -> Left i
   Right (a, _) -> Right a
@@ -192,18 +192,18 @@ runGet m str = case unGet m (initState str) finalK of
 -- | Run the Get monad applies a 'get'-based parser on the input
 -- ByteString. Additional to the result of get it returns the number of
 -- consumed bytes and the rest of the input.
-runGetState :: Get a -> L.ByteString -> Int64
-            -> Either String (a, L.ByteString, Int64)
+runGetState :: Get a -> B.ByteString -> Int
+            -> Either String (a, B.ByteString, Int)
 runGetState m str off =
     case unGet m (mkState str off) finalK of
-      Left i                      -> Left i
-      Right (a, ~(S s ss newOff)) -> Right (a, s `join` ss, newOff)
+      Left i                   -> Left i
+      Right (a, ~(S s newOff)) -> Right (a, s, newOff)
 
 ------------------------------------------------------------------------
 
 failDesc :: String -> Get a
 failDesc err = do
-    S _ _ bytes <- get
+    S _ bytes <- get
     Get (\_ _ -> Left (err ++ ". Failed reading at byte position " ++ show bytes))
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
@@ -211,14 +211,12 @@ skip :: Int -> Get ()
 skip n = readN (fromIntegral n) (const ())
 
 -- | Skip ahead @n@ bytes. No error if there isn't enough bytes.
-uncheckedSkip :: Int64 -> Get ()
+uncheckedSkip :: Int -> Get ()
 uncheckedSkip n = do
-    S s ss bytes <- get
-    if fromIntegral (B.length s) >= n
-      then put (S (B.drop (fromIntegral n) s) ss (bytes + n))
-      else do
-        let rest = L.drop (n - fromIntegral (B.length s)) ss
-        put $! mkState rest (bytes + n)
+    S s bytes <- get
+    if B.length s >= n
+      then put $! S (B.drop (fromIntegral n) s) (bytes + n)
+      else put $! mkState B.empty (bytes + n)
 
 -- | Run @ga@, but return without consuming its input.
 -- Fails if @ga@ fails.
@@ -251,36 +249,34 @@ lookAheadE gea = do
     return ea
 
 -- | Get the next up to @n@ bytes as a lazy ByteString, without consuming them. 
-uncheckedLookAhead :: Int64 -> Get L.ByteString
+uncheckedLookAhead :: Int -> Get B.ByteString
 uncheckedLookAhead n = do
-    S s ss _ <- get
-    if n <= fromIntegral (B.length s)
-        then return (L.fromChunks [B.take (fromIntegral n) s])
-        else return $ L.take n (s `join` ss)
+    S s _ <- get
+    return (B.take n s)
 
 ------------------------------------------------------------------------
 -- Utility
 
 -- | Get the total number of bytes read to this point.
-bytesRead :: Get Int64
+bytesRead :: Get Int
 bytesRead = do
-    S _ _ b <- get
+    S _ b <- get
     return b
 
 -- | Get the number of remaining unparsed bytes.
 -- Useful for checking whether all input has been consumed.
 -- Note that this forces the rest of the input.
-remaining :: Get Int64
+remaining :: Get Int
 remaining = do
-    S s ss _ <- get
-    return (fromIntegral (B.length s) + L.length ss)
+    S s _ <- get
+    return (B.length s)
 
 -- | Test whether all input has been consumed,
 -- i.e. there are no remaining unparsed bytes.
 isEmpty :: Get Bool
 isEmpty = do
-    S s ss _ <- get
-    return (B.null s && L.null ss)
+    S s _ <- get
+    return (B.null s)
 
 ------------------------------------------------------------------------
 -- Utility with ByteStrings
@@ -293,35 +289,33 @@ getByteString n = readN n id
 
 -- | An efficient 'get' method for lazy ByteStrings. Does not fail if fewer than
 -- @n@ bytes are left in the input.
-getLazyByteString :: Int64 -> Get L.ByteString
+getLazyByteString :: Int -> Get B.ByteString
 getLazyByteString n = do
-    S s ss bytes <- get
-    let big = s `join` ss
-    case splitAtST n big of
-      (consume, rest) -> do put $ mkState rest (bytes + n)
+    S s bytes <- get
+    case B.splitAt n s of
+      (consume, rest) -> do put $! mkState rest (bytes + n)
                             return consume
 {-# INLINE getLazyByteString #-}
 
 -- | Get a lazy ByteString that is terminated with a NUL byte. Fails
--- if it reaches the end of input without hitting a NUL.
-getLazyByteStringNul :: Get L.ByteString
+-- if it reaches the end of input without hitting a NUB.
+getLazyByteStringNul :: Get B.ByteString
 getLazyByteStringNul = do
-    S s ss bytes <- get
-    let big = s `join` ss
-        (consume, t) = L.break (== 0) big
-        (h, rest) = L.splitAt 1 t
-    if L.null h
+    S s bytes <- get
+    let (consume, t) = B.break (== 0) s
+        (h, rest) = B.splitAt 1 t
+    if B.null h
       then fail "too few bytes"
       else do
-        put $ mkState rest (bytes + L.length consume + 1)
+        put $ mkState rest (bytes + B.length consume + 1)
         return consume
 {-# INLINE getLazyByteStringNul #-}
 
 -- | Get the remaining bytes as a lazy ByteString
-getRemainingLazyByteString :: Get L.ByteString
+getRemainingLazyByteString :: Get B.ByteString
 getRemainingLazyByteString = do
-    S s ss _ <- get
-    return (s `join` ss)
+    S s _ <- get
+    return s
 
 ------------------------------------------------------------------------
 -- Helpers
@@ -329,38 +323,26 @@ getRemainingLazyByteString = do
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
 getBytes n = do
-    S s ss bytes <- get
-    if n <= B.length s
-        then do let (consume,rest) = B.splitAt n s
-                put $! S rest ss (bytes + fromIntegral n)
-                return $! consume
-        else
-              case L.splitAt (fromIntegral n) (s `join` ss) of
-                (consuming, rest) ->
-                    do let now = B.concat . L.toChunks $ consuming
-                       put $! mkState rest (bytes + fromIntegral n)
-                       -- forces the next chunk before this one is returned
-                       if (B.length now < n)
-                         then
-                            fail "too few bytes"
-                         else
-                            return now
+    S s bytes <- get
+    let (consume,rest) = B.splitAt n s
+    put $! S rest (bytes + fromIntegral n)
+    return $! consume
 {- INLINE getBytes -}
 -- ^ important
 
 #ifndef BYTESTRING_IN_BASE
-join :: B.ByteString -> L.ByteString -> L.ByteString
+join :: B.ByteString -> B.ByteString -> B.ByteString
 join bb lb
     | B.null bb = lb
-    | otherwise = L.Chunk bb lb
+    | otherwise = B.append bb lb
 
 #else
-join :: B.ByteString -> L.ByteString -> L.ByteString
+join :: B.ByteString -> B.ByteString -> B.ByteString
 join bb (B.LPS lb)
     | B.null bb = B.LPS lb
     | otherwise = B.LPS (bb:lb)
 #endif
-    -- don't use L.append, it's strict in it's second argument :/
+    -- don't use B.append, it's strict in it's second argument :/
 {- INLINE join -}
 
 -- | Split a ByteString. If the first result is consumed before the --
@@ -371,8 +353,9 @@ join bb (B.LPS lb)
 -- > case splitAtST n xs of
 -- >    (ys,zs) -> consume ys ... consume zs
 --
-splitAtST :: Int64 -> L.ByteString -> (L.ByteString, L.ByteString)
-splitAtST i ps | i <= 0 = (L.empty, ps)
+splitAtST :: Int -> B.ByteString -> (B.ByteString, B.ByteString)
+splitAtST i ps = B.splitAt i ps
+{-
 #ifndef BYTESTRING_IN_BASE
 splitAtST i ps          = runST (
      do r  <- newSTRef undefined
@@ -381,14 +364,11 @@ splitAtST i ps          = runST (
         return (xs, ys))
 
   where
-        first r 0 xs@(L.Chunk _ _) = writeSTRef r xs    >> return L.Empty
-        first r _ L.Empty          = writeSTRef r L.Empty >> return L.Empty
-
-        first r n (L.Chunk x xs)
-          | n < l     = do writeSTRef r (L.Chunk (B.drop (fromIntegral n) x) xs)
-                           return $ L.Chunk (B.take (fromIntegral n) x) L.Empty
-          | otherwise = do writeSTRef r (L.drop (n - l) xs)
-                           liftM (L.Chunk x) $ unsafeInterleaveST (first r (n - l) xs)
+        first r 0 xs | B.null xs = writeSTRef r B.empty >> return B.empty
+                     | n < l     = do writeSTRef r (B.Chunk (B.drop (fromIntegral n) x) xs)
+                                      return $ B.Chunk (B.take (fromIntegral n) x) B.Empty
+                     | otherwise = do writeSTRef r (B.drop (n - l) xs)
+                                      liftM (B.Chunk x) $ unsafeInterleaveST (first r (n - l) xs)
 
          where l = fromIntegral (B.length x)
 #else
@@ -403,11 +383,12 @@ splitAtST i (B.LPS ps)  = runST (
         first r n (x:xs)
           | n < l     = do writeSTRef r (B.drop (fromIntegral n) x : xs)
                            return [B.take (fromIntegral n) x]
-          | otherwise = do writeSTRef r (L.toChunks (L.drop (n - l) (B.LPS xs)))
+          | otherwise = do writeSTRef r (B.toChunks (B.drop (n - l) (B.LPS xs)))
                            fmap (x:) $ unsafeInterleaveST (first r (n - l) xs)
 
          where l = fromIntegral (B.length x)
 #endif
+-}
 {- INLINE splitAtST -}
 
 -- Pull n bytes from the input, and apply a parser to those bytes,
@@ -486,7 +467,7 @@ getWord64be = do
               (fromIntegral (s `B.index` 5) `shiftl_w64` 16) .|.
               (fromIntegral (s `B.index` 6) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.index` 7) )
-{- INLINE getWord64be -}
+{-# INLINE getWord64be #-}
 
 -- | Read a Word64 in little endian format
 getWord64le :: Get Word64
@@ -500,7 +481,7 @@ getWord64le = do
               (fromIntegral (s `B.index` 2) `shiftl_w64` 16) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.index` 0) )
-{- INLINE getWord64le -}
+{-# INLINE getWord64le #-}
 
 ------------------------------------------------------------------------
 -- Host-endian reads

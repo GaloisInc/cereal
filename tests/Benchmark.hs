@@ -2,6 +2,7 @@
 module Main (main) where
 
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString as B
 import Data.BinarE
 import Data.BinarE.Put
 import Data.BinarE.Get
@@ -59,7 +60,7 @@ test wordSize chunkSize end mb = do
         bytes = mb * 2^20
         iterations = bytes `div` wordSize
         bs  = runPut (doPut wordSize chunkSize end iterations)
-        sum = runGet (doGet wordSize chunkSize end iterations) bs
+        sum = runGet (doGet wordSize chunkSize end iterations) (B.concat (L.toChunks bs))
 
     case (chunkSize,end) of (1,Host) -> putStrLn "" ; _ -> return ()
 

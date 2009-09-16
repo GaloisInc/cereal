@@ -232,7 +232,7 @@ encode = runPut . put
 
 -- | Decode a value from a lazy ByteString, reconstructing the original structure.
 --
-decode :: Binary a => ByteString -> Either String a
+decode :: Binary a => B.ByteString -> Either String a
 decode = runGet get
 
 ------------------------------------------------------------------------
@@ -269,7 +269,7 @@ encodeFile f v = L.writeFile f (encode v)
 --
 decodeFile :: Binary a => FilePath -> IO (Either String a)
 decodeFile f = do
-    s <- L.readFile f
+    s <- B.readFile f
     return $ runGet (do v <- get
                         m <- isEmpty
                         m `seq` return v) s
@@ -629,10 +629,11 @@ instance Binary B.ByteString where
 -- 
 -- Requires 'flexible instances'
 --
+{-
 instance Binary ByteString where
     put bs = do put (fromIntegral (L.length bs) :: Int)
                 putLazyByteString bs
-    get    = get >>= getLazyByteString
+    get    = get >>= getLazyByteString-}
 
 ------------------------------------------------------------------------
 -- Maps and Sets
