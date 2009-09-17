@@ -38,7 +38,6 @@ module Data.Binary.Safe.Get (
     , uncheckedLookAhead
 
     -- * Utility
-    , bytesRead
     , getBytes
     , remaining
     , isEmpty
@@ -91,20 +90,20 @@ import GHC.Base
 import GHC.Word
 #endif
 
--- | The parse state
-data S = S {-# UNPACK #-} !B.ByteString -- input
-           {-# UNPACK #-} !Int          -- bytes read
-           {-# UNPACK #-} !Int          -- bytes available
-
 type Trace = [String] -> String
+
+type Failure   r = String            -> Either String (r, B.ByteString)
+type Success a r = B.ByteString -> a -> Either String (r, B.ByteString)
 
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
-  { unGet :: forall r. Trace -> S -> (S -> a -> Either String (r, S))
-                             -> Either String (r, S) }
+  { unGet :: forall r. Trace -> B.ByteString
+                    -> Failure   r -- failure
+                    -> Success a r -- success
+                    -> Either String (r, B.ByteString) }
 
 instance Functor Get where
-    fmap f m = Get (\t s0 k -> unGet m t s0 (\s a -> k s (f a)))
+    fmap p m = Get (\t s0 f k -> unGet m t s0 f (\s a -> k s (p a)))
 
 
 #ifdef APPLICATIVE_IN_BASE
@@ -115,16 +114,14 @@ instance Applicative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a = Get (\_ s0 k -> k s0 a)
-    m >>= f  = Get (\t s0 k -> unGet m t s0 (\s a -> unGet (f a) t s k))
+    return a = Get (\_ s0 _ k -> k s0 a)
+    m >>= g  = Get (\t s0 f k -> unGet m t s0 f (\s a -> unGet (g a) t s f k))
     fail     = failDesc
 
 instance MonadPlus Get where
-    mzero = Get (\t _ _ -> Left ("mzero" ++ "\n" ++ t []))
+    mzero = failDesc "mzero"
 
-    mplus a b = Get $ \t s0 k -> case unGet a t s0 k of
-      Left _    -> unGet b t s0 k
-      Right res -> Right res
+    mplus a b = Get (\t s0 f k -> unGet a t s0 (\_ -> unGet b t s0 f k) k)
 
 ------------------------------------------------------------------------
 
@@ -132,27 +129,24 @@ formatTrace :: Trace
 formatTrace [] = "Empty call stack"
 formatTrace ls = "From:\t" ++ intercalate "\n\t" ls ++ "\n"
 
-get :: Get S
-get  = Get (\_ s0 k -> k s0 s0)
+get :: Get B.ByteString
+get  = Get (\_ s0 _ k -> k s0 s0)
 
-put :: S -> Get ()
-put s = Get (\_ _ k -> k s ())
+put :: B.ByteString -> Get ()
+put s = Get (\_ _ _ k -> k s ())
 
 label :: String -> Get a -> Get a
 label l m = Get (\t s0 k -> unGet m (\ls -> t (l:ls)) s0 k)
 
-initState :: B.ByteString -> S
-initState xs = mkState xs 0
-
-mkState :: B.ByteString -> Int -> S
-mkState xs off = S xs off (B.length xs)
-
-finalK :: S -> a -> Either String (a,S)
+finalK :: Success a a
 finalK s a = Right (a,s)
+
+failK :: Failure a
+failK  = Left
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
-runGet m str = case unGet m formatTrace (initState str) finalK of
+runGet m str = case unGet m formatTrace str failK finalK of
   Left  i      -> Left i
   Right (a, _) -> Right a
 
@@ -160,11 +154,11 @@ runGet m str = case unGet m formatTrace (initState str) finalK of
 -- ByteString. Additional to the result of get it returns the number of
 -- consumed bytes and the rest of the input.
 runGetState :: Get a -> B.ByteString -> Int
-            -> Either String (a, B.ByteString, Int)
+            -> Either String (a, B.ByteString)
 runGetState m str off =
-    case unGet m formatTrace (mkState str off) finalK of
-      Left i                     -> Left i
-      Right (a, ~(S s newOff _)) -> Right (a, s, newOff)
+    case unGet m formatTrace (B.drop off str) failK finalK of
+      Left i        -> Left i
+      Right (a, bs) -> Right (a, bs)
 
 ------------------------------------------------------------------------
 
@@ -172,21 +166,21 @@ runGetState m str off =
 --   is required to consume all the bytes that it is isolated to.
 isolate :: String -> Int -> Get a -> Get a
 isolate l n m = label l $ do
-  S s bytes left <- get
-  let boundary = bytes + n
-  unless (boundary <= left) (fail "not enough space left to isolate")
-  put $! S s bytes boundary
-  a             <- m
-  S s' bytes' _ <- get
-  unless (bytes' == boundary) (fail "not all bytes parsed in isolate")
-  put $! S s' boundary left
+  s <- get
+  let left = B.length s
+  unless (n <= left) (fail "not enough space left to isolate")
+  let (s',rest) = B.splitAt n s
+  put s'
+  a    <- m
+  used <- get
+  unless (B.null used) (fail "not all bytes parsed in isolate")
+  put rest
   return a
 
 failDesc :: String -> Get a
 failDesc err = do
-    S _ bytes _  <- get
-    let msg = concat [ "Failed reading at position ", show bytes , ", ", err ]
-    Get (\t _ _ -> Left (msg ++ "\n" ++ t []))
+    let msg = "Failed reading" ++ err
+    Get (\t _ f _ -> f (msg ++ "\n" ++ t []))
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
@@ -195,9 +189,8 @@ skip n = readN n (const ())
 -- | Skip ahead @n@ bytes. No error if there isn't enough bytes.
 uncheckedSkip :: Int -> Get ()
 uncheckedSkip n = do
-    S s bytes left <- get
-    let off = min (bytes + n) left
-    put $! S (B.drop n s) off left
+    s <- get
+    put (B.drop n s)
 
 -- | Run @ga@, but return without consuming its input.
 -- Fails if @ga@ fails.
@@ -231,33 +224,22 @@ lookAheadE gea = do
 -- | Get the next up to @n@ bytes as a ByteString, without consuming them.
 uncheckedLookAhead :: Int -> Get B.ByteString
 uncheckedLookAhead n = do
-    S s _ _ <- get
+    s <- get
     return (B.take n s)
 
 ------------------------------------------------------------------------
 -- Utility
 
--- | Get the total number of bytes read to this point.
-bytesRead :: Get Int
-bytesRead = do
-    S _ b _ <- get
-    return b
-
 -- | Get the number of remaining unparsed bytes.
 -- Useful for checking whether all input has been consumed.
 -- Note that this forces the rest of the input.
 remaining :: Get Int
-remaining = do
-    S _ bytes left <- get
-    return (left - bytes)
+remaining = B.length `fmap` get
 
 -- | Test whether all input has been consumed,
 -- i.e. there are no remaining unparsed bytes.
 isEmpty :: Get Bool
-isEmpty = do
-    S _ bytes left <- get
-    return (bytes == left) -- compare bytes and left, so that this works within
-                           -- isolation blocks.
+isEmpty = B.null `fmap` get
 
 ------------------------------------------------------------------------
 -- Utility with ByteStrings
@@ -277,12 +259,12 @@ getRemaining  = getByteString =<< remaining
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
 getBytes n = do
-    S s bytes left <- get
-    let off = bytes + n
-    when (off > left) (fail ("too few bytes"))
+    s <- get
+    let left = B.length s
+    when (n > left) (fail ("too few bytes"))
     let (consume,rest) = B.splitAt n s
-    put $! S rest off left
-    return $! consume
+    put rest
+    return consume
 
 -- Pull n bytes from the input, and apply a parser to those bytes,
 -- yielding a value. If less than @n@ bytes are available, fail with an
