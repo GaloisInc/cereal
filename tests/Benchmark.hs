@@ -1,11 +1,10 @@
 {-# OPTIONS -fbang-patterns #-}
 module Main (main) where
 
-import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
-import Data.BinarE
-import Data.BinarE.Put
-import Data.BinarE.Get
+import Data.Binary.Safe
+import Data.Binary.Safe.Put
+import Data.Binary.Safe.Get
 
 import Control.Exception
 import System.CPUTime
@@ -60,16 +59,15 @@ test wordSize chunkSize end mb = do
         bytes = mb * 2^20
         iterations = bytes `div` wordSize
         bs  = runPut (doPut wordSize chunkSize end iterations)
-        sum = runGet (doGet wordSize chunkSize end iterations) (B.concat (L.toChunks bs))
+        sum = runGet (doGet wordSize chunkSize end iterations) bs
 
     case (chunkSize,end) of (1,Host) -> putStrLn "" ; _ -> return ()
 
     printf "%dMB of Word%-2d in chunks of %2d (%6s endian): "
         (mb :: Int) (8 * wordSize :: Int) (chunkSize :: Int) (show end)
 
-    putSeconds <- time $ evaluate (L.length bs)
+    putSeconds <- time $ evaluate (B.length bs)
     getSeconds <- time $ evaluate sum
---    print (L.length bs, sum)
     let putThroughput = fromIntegral mb / putSeconds
         getThroughput = fromIntegral mb / getSeconds
 
