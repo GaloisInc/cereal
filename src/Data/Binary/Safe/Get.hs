@@ -48,6 +48,7 @@ module Data.Binary.Safe.Get (
 
     -- ** ByteStrings
     , getByteString
+    , getRemaining
 
     -- ** Big-endian reads
     , getWord16be
@@ -265,6 +266,9 @@ isEmpty = do
 -- than @n@ bytes are left in the input.
 getByteString :: Int -> Get B.ByteString
 getByteString n = readN n id
+
+getRemaining :: Get B.ByteString
+getRemaining  = getByteString =<< remaining
 
 
 ------------------------------------------------------------------------
