@@ -248,8 +248,8 @@ bytesRead = do
 -- Note that this forces the rest of the input.
 remaining :: Get Int
 remaining = do
-    S _ _ left <- get
-    return left
+    S _ bytes left <- get
+    return (left - bytes)
 
 -- | Test whether all input has been consumed,
 -- i.e. there are no remaining unparsed bytes.
