@@ -95,16 +95,13 @@ data S = S {-# UNPACK #-} !B.ByteString -- input
            {-# UNPACK #-} !Int          -- bytes read
            {-# UNPACK #-} !Int          -- bytes available
 
-type Trace = [(Int,String)]
-
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
-  { unGet :: forall r. Trace -> S
-                    -> (Trace -> S -> a -> Either String (r, S))
-                    -> Either String (r, S) }
+  { unGet :: forall r. S -> (S -> a -> Either String (r, S))
+                         -> Either String (r, S) }
 
 instance Functor Get where
-    fmap f m = Get (\t0 s0 k -> unGet m t0 s0 (\t s a -> k t s (f a)))
+    fmap f m = Get (\s0 k -> unGet m s0 (\s a -> k s (f a)))
 
 
 #ifdef APPLICATIVE_IN_BASE
@@ -115,27 +112,24 @@ instance Applicative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a = Get (\t0 s0 k -> k t0 s0 a)
-    m >>= f  = Get (\t0 s0 k -> unGet m t0 s0 (\t s a -> unGet (f a) t s k))
+    return a = Get (\s0 k -> k s0 a)
+    m >>= f  = Get (\s0 k -> unGet m s0 (\s a -> unGet (f a) s k))
     fail     = failDesc
 
 instance MonadPlus Get where
-    mzero = Get (\_ _ _ -> Left "mzero")
+    mzero = Get (\_ _ -> Left "mzero")
 
-    mplus a b = Get $ \t0 s0 k -> case unGet a t0 s0 k of
-      Left _    -> unGet b t0 s0 k
+    mplus a b = Get $ \s0 k -> case unGet a s0 k of
+      Left _    -> unGet b s0 k
       Right res -> Right res
 
 ------------------------------------------------------------------------
 
 get :: Get S
-get  = Get (\t s0 k -> k t s0 s0)
+get  = Get (\s0 k -> k s0 s0)
 
 put :: S -> Get ()
-put s = Get (\t _ k -> k t s ())
-
-label :: String -> Get a -> Get a
-label l m = Get (\t0 s0@(S _ p _) k -> unGet m ((p,l):t0) s0 k)
+put s = Get (\_ k -> k s ())
 
 initState :: B.ByteString -> S
 initState xs = mkState xs 0
@@ -143,12 +137,12 @@ initState xs = mkState xs 0
 mkState :: B.ByteString -> Int -> S
 mkState xs off = S xs off (B.length xs)
 
-finalK :: Trace -> S -> a -> Either String (a,S)
-finalK _ s a = Right (a,s)
+finalK :: S -> a -> Either String (a,S)
+finalK s a = Right (a,s)
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
-runGet m str = case unGet m [] (initState str) finalK of
+runGet m str = case unGet m (initState str) finalK of
   Left  i      -> Left i
   Right (a, _) -> Right a
 
@@ -158,7 +152,7 @@ runGet m str = case unGet m [] (initState str) finalK of
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString, Int)
 runGetState m str off =
-    case unGet m [] (mkState str off) finalK of
+    case unGet m (mkState str off) finalK of
       Left i                     -> Left i
       Right (a, ~(S s newOff _)) -> Right (a, s, newOff)
 
@@ -166,8 +160,8 @@ runGetState m str off =
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
-isolate :: String -> Int -> Get a -> Get a
-isolate l n m = label l $ do
+isolate :: Int -> Get a -> Get a
+isolate n m = do
   S s bytes left <- get
   let boundary = bytes + n
   unless (boundary <= left) (fail "not enough space left to isolate")
@@ -181,12 +175,8 @@ isolate l n m = label l $ do
 failDesc :: String -> Get a
 failDesc err = do
     S _ bytes _  <- get
-    let fmt (p,l) = "\t" ++ show p ++ "\t" ++ l
-    let msg t = concat
-          [ "Failed reading at position ", show bytes
-          , ", ", err, "\nFrom"
-          , unlines (map fmt t) ]
-    Get (\t _ _ -> Left (msg t))
+    let msg = concat [ "Failed reading at position ", show bytes , ", ", err ]
+    Get (\_ _ -> Left msg)
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
