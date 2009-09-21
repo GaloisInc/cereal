@@ -24,6 +24,7 @@ module Data.Binary.Safe.Builder (
 
     -- * The Builder type
       Builder
+    , toByteString
     , toLazyByteString
 
     -- * Constructing Builders
@@ -159,6 +160,9 @@ data Buffer = Buffer {-# UNPACK #-} !(ForeignPtr Word8)
                      {-# UNPACK #-} !Int                -- length left
 
 ------------------------------------------------------------------------
+
+toByteString :: Builder -> S.ByteString
+toByteString  = S.concat . L.toChunks . toLazyByteString
 
 -- | /O(n)./ Extract a lazy 'L.ByteString' from a 'Builder'.
 -- The construction work takes place if and when the relevant part of

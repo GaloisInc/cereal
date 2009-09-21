@@ -50,7 +50,7 @@ module Data.Binary.Safe.Put (
   ) where
 
 import Data.Monoid
-import Data.Binary.Safe.Builder (Builder, toLazyByteString)
+import Data.Binary.Safe.Builder (Builder, toByteString)
 import qualified Data.Binary.Safe.Builder as B
 
 import Data.Word
@@ -120,13 +120,13 @@ execPut = sndS . unPut
 {-# INLINE execPut #-}
 
 -- | Run the 'Put' monad with a serialiser
-runPut :: Put -> L.ByteString
-runPut = toLazyByteString . sndS . unPut
+runPut :: Put -> S.ByteString
+runPut = toByteString . sndS . unPut
 {-# INLINE runPut #-}
 
 -- | Run the 'Put' monad with a serialiser and get its result
-runPutM :: PutM a -> (a, L.ByteString)
-runPutM (Put (PairS f s)) = (f, toLazyByteString s)
+runPutM :: PutM a -> (a, S.ByteString)
+runPutM (Put (PairS f s)) = (f, toByteString s)
 {-# INLINE runPutM #-}
 
 ------------------------------------------------------------------------

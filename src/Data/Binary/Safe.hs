@@ -65,8 +65,7 @@ import Control.Monad
 import Foreign
 import System.IO
 
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as L
+import Data.ByteString (ByteString)
 
 import Data.Char    (chr,ord)
 import Data.List    (unfoldr)
@@ -249,7 +248,7 @@ decode = runGet get
 -- > B.writeFile f . compress . encode
 --
 encodeFile :: Binary a => FilePath -> a -> IO ()
-encodeFile f v = L.writeFile f (encode v)
+encodeFile f v = B.writeFile f (encode v)
 
 -- | Lazily reconstruct a value previously written to a file.
 --
