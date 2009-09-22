@@ -44,10 +44,6 @@ module Data.Binary.Safe (
     , encode                    -- :: Binary a => a -> ByteString
     , decode                    -- :: Binary a => ByteString -> a
 
-    -- * IO functions for serialisation
-    , encodeFile                -- :: Binary a => FilePath -> a -> IO ()
-    , decodeFile                -- :: Binary a => FilePath -> IO a
-
 -- Lazy put and get
 --  , lazyPut
 --  , lazyGet
@@ -63,7 +59,6 @@ import Data.Binary.Safe.Get
 
 import Control.Monad
 import Foreign
-import System.IO
 
 import Data.ByteString (ByteString)
 
@@ -233,47 +228,6 @@ encode = runPut . put
 --
 decode :: Binary a => B.ByteString -> Either String a
 decode = runGet get
-
-------------------------------------------------------------------------
--- Convenience IO operations
-
--- | Lazily serialise a value to a file
---
--- This is just a convenience function, it's defined simply as:
---
--- > encodeFile f = B.writeFile f . encode
---
--- So for example if you wanted to compress as well, you could use:
---
--- > B.writeFile f . compress . encode
---
-encodeFile :: Binary a => FilePath -> a -> IO ()
-encodeFile f v = B.writeFile f (encode v)
-
--- | Lazily reconstruct a value previously written to a file.
---
--- This is just a convenience function, it's defined simply as:
---
--- > decodeFile f = return . decode =<< B.readFile f
---
--- So for example if you wanted to decompress as well, you could use:
---
--- > return . decode . decompress =<< B.readFile f
---
--- After contructing the data from the input file, 'decodeFile' checks
--- if the file is empty, and in doing so will force the associated file
--- handle closed, if it is indeed empty. If the file is not empty, 
--- it is up to the decoding instance to consume the rest of the data,
--- or otherwise finalise the resource.
---
-decodeFile :: Binary a => FilePath -> IO (Either String a)
-decodeFile f = do
-    s <- B.readFile f
-    return $ runGet (do v <- get
-                        m <- isEmpty
-                        m `seq` return v) s
-
--- needs bytestring 0.9.1.x to work 
 
 ------------------------------------------------------------------------
 -- Lazy put and get
