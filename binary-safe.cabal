@@ -2,8 +2,8 @@ name:            binary-safe
 version:         0.1
 license:         BSD3
 license-file:    LICENSE
-author:          Galois, Inc.
-maintainer:      Galois, Inc.
+author:          Lennart Kolmodin <kolmodin@dtek.chalmers.se>, Galois Inc.
+maintainer:      Galois Inc.
 category:        Data, Parsing
 stability:       provisional
 build-type:      Simple
@@ -11,8 +11,13 @@ cabal-version:   >= 1.6
 extra-source-files: README index.html
 
 flag bytestring-in-base
+  default: False
+
 flag split-base
+  default: True
+
 flag applicative-in-base
+  default: True
 
 library
   if flag(bytestring-in-base)
@@ -46,10 +51,8 @@ library
 
   extensions:      CPP,
                    FlexibleContexts,
+                   FlexibleInstances,
                    Rank2Types,
                    MagicHash
 
   ghc-options:     -O2 -Wall -fliberate-case-threshold=1000
-
---  if impl(ghc < 6.5)
---    ghc-options:   -fallow-undecidable-instances

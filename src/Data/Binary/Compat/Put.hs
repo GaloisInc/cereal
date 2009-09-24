@@ -1,13 +1,13 @@
 {-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Put
+-- Module      : Data.Binary.Compat.Put
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Galois, Inc.
--- Stability   : stable
--- Portability : Portable to Hugs and GHC. Requires MPTCs
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   :
+-- Portability :
 --
 -- The Put monad. A monad for efficiently constructing lazy bytestrings.
 --

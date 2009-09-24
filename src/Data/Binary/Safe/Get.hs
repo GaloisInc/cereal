@@ -5,15 +5,15 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Binary.Safe.Get
--- Copyright   : Lennart Kolmodin
+-- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Galois, Inc.
--- Stability   : experimental
--- Portability : portable to Hugs and GHC.
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   :
+-- Portability :
 --
 -- The Get monad. A monad for efficiently building structures from
--- encoded lazy ByteStrings
+-- strict ByteStrings
 --
 -----------------------------------------------------------------------------
 

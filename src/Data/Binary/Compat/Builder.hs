@@ -4,13 +4,13 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Safe.Builder
--- Copyright   : Lennart Kolmodin, Ross Paterson
+-- Module      : Data.Binary.Compat.Builder
+-- Copyright   : Lennart Kolmodin, Ross Paterson, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Galois, Inc.
--- Stability   : experimental
--- Portability : portable to Hugs and GHC
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   :
+-- Portability :
 --
 -- Efficient construction of lazy bytestrings.
 --

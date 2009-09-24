@@ -1,22 +1,22 @@
-{-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Binary.Safe
--- Copyright   : Lennart Kolmodin
+-- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
 -- 
--- Maintainer  : Lennart Kolmodin <kolmodin@dtek.chalmers.se>
--- Stability   : unstable
--- Portability : portable to Hugs and GHC. Requires the FFI and some flexible instances
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   :
+-- Portability :
 --
--- Binary serialisation of Haskell values to and from lazy ByteStrings.
+-- Binary serialisation of Haskell values to and from strict ByteStrings.
 -- The Binary library provides methods for encoding Haskell values as
 -- streams of bytes directly in memory. The resulting @ByteString@ can
 -- then be written to disk, sent over the network, or futher processed
 -- (for example, compressed with gzip).
---
--- The 'Binary' package is notable in that it provides both pure, and
--- high performance serialisation.
 --
 -- Values are always encoded in network order (big endian) form, and
 -- encoded data should be portable across machine endianess, word size,
@@ -365,72 +365,6 @@ roll   = foldr unstep 0
   where
     unstep b a = a `shiftL` 8 .|. fromIntegral b
 
-{-
-
---
--- An efficient, raw serialisation for Integer (GHC only)
---
-
--- TODO  This instance is not architecture portable.  GMP stores numbers as
--- arrays of machine sized words, so the byte format is not portable across
--- architectures with different endianess and word size.
-
-import Data.ByteString.Base (toForeignPtr,unsafePackAddress, memcpy)
-import GHC.Base     hiding (ord, chr)
-import GHC.Prim
-import GHC.Ptr (Ptr(..))
-import GHC.IOBase (IO(..))
-
-instance Binary Integer where
-    put (S# i)    = putWord8 0 >> put (I# i)
-    put (J# s ba) = do
-        putWord8 1
-        put (I# s)
-        put (BA ba)
-
-    get = do
-        b <- getWord8
-        case b of
-            0 -> do (I# i#) <- get
-                    return (S# i#)
-            _ -> do (I# s#) <- get
-                    (BA a#) <- get
-                    return (J# s# a#)
-
-instance Binary ByteArray where
-
-    -- Pretty safe.
-    put (BA ba) =
-        let sz   = sizeofByteArray# ba   -- (primitive) in *bytes*
-            addr = byteArrayContents# ba
-            bs   = unsafePackAddress (I# sz) addr
-        in put bs   -- write as a ByteString. easy, yay!
-
-    -- Pretty scary. Should be quick though
-    get = do
-        (fp, off, n@(I# sz)) <- liftM toForeignPtr get      -- so decode a ByteString
-        assert (off == 0) $ return $ unsafePerformIO $ do
-            (MBA arr) <- newByteArray sz                    -- and copy it into a ByteArray#
-            let to = byteArrayContents# (unsafeCoerce# arr) -- urk, is this safe?
-            withForeignPtr fp $ \from -> memcpy (Ptr to) from (fromIntegral n)
-            freezeByteArray arr
-
--- wrapper for ByteArray#
-data ByteArray = BA  {-# UNPACK #-} !ByteArray#
-data MBA       = MBA {-# UNPACK #-} !(MutableByteArray# RealWorld)
-
-newByteArray :: Int# -> IO MBA
-newByteArray sz = IO $ \s ->
-  case newPinnedByteArray# sz s of { (# s', arr #) ->
-  (# s', MBA arr #) }
-
-freezeByteArray :: MutableByteArray# RealWorld -> IO ByteArray
-freezeByteArray arr = IO $ \s ->
-  case unsafeFreezeByteArray# arr s of { (# s', arr' #) ->
-  (# s', BA arr' #) }
-
--}
-
 instance (Binary a,Integral a) => Binary (R.Ratio a) where
     put r = put (R.numerator r) >> put (R.denominator r)
     get = liftM2 (R.%) get get
@@ -576,16 +510,6 @@ instance Binary B.ByteString where
                 putByteString bs
     get    = get >>= getByteString
 
---
--- Using old versions of fps, this is a type synonym, and non portable
--- 
--- Requires 'flexible instances'
---
-{-
-instance Binary ByteString where
-    put bs = do put (fromIntegral (L.length bs) :: Int)
-                putLazyByteString bs
-    get    = get >>= getLazyByteString-}
 
 ------------------------------------------------------------------------
 -- Maps and Sets

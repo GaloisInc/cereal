@@ -1,3 +1,14 @@
+--------------------------------------------------------------------------------
+-- |
+-- Module      : Data.Binary.Compat.Get
+-- Copyright   : (c) Galois, Inc, 2009
+-- License     : BSD3
+--
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   :
+-- Portability :
+--
+
 module Data.Binary.Compat.Get (
     -- * The Get type
       Get
@@ -49,9 +60,11 @@ import qualified Data.ByteString      as S
 import qualified Data.ByteString.Lazy as L
 
 
+-- | Run the Get monad.
 runGet :: Get a -> L.ByteString -> Either String a
 runGet m bs = Safe.runGet m (S.concat (L.toChunks bs))
 
+-- | Run the Get monad, starting from an offset in the given ByteString.
 runGetState :: Get a -> L.ByteString -> Int -> Either String (a, L.ByteString)
 runGetState m bs off = case Safe.runGetState m (S.concat (L.toChunks bs)) off of
   Left err      -> Left err

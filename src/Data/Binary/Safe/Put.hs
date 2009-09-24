@@ -1,3 +1,14 @@
+--------------------------------------------------------------------------------
+-- |
+-- Module      : Data.Binary.Safe.Put
+-- Copyright   : (c) Galois Inc. 2009
+-- License     : BSD3
+--
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   :
+-- Portability :
+--
+
 module Data.Binary.Safe.Put (
 
     -- * The Put type
@@ -40,9 +51,11 @@ import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
 
 
+-- | Run the Put monad.
 runPut :: Put -> S.ByteString
 runPut m = S.concat (L.toChunks (Bin.runPut m))
 
+-- | Run the Put monad, and get its result.
 runPutM :: PutM a -> (a, S.ByteString)
 runPutM m = (a, S.concat (L.toChunks bs))
   where (a,bs) = Bin.runPutM m
