@@ -20,7 +20,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.Binary.Builder (
+module Data.Binary.Compat.Builder (
 
     -- * The Builder type
       Builder

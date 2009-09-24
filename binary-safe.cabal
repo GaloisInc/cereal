@@ -38,11 +38,11 @@ library
   exposed-modules: Data.Binary.Safe,
                    Data.Binary.Safe.Put,
                    Data.Binary.Safe.Get,
-                   Data.Binary.Safe.Builder,
 
-                   Data.Binary,
-                   Data.Binary.Get,
-                   Data.Binary.Put
+                   Data.Binary.Compat,
+                   Data.Binary.Compat.Builder,
+                   Data.Binary.Compat.Get,
+                   Data.Binary.Compat.Put
 
   extensions:      CPP,
                    FlexibleContexts,

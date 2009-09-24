@@ -34,10 +34,10 @@ module Data.Binary.Safe.Put (
 
   ) where
 
-import Data.Binary.Put hiding (runPut,runPutM)
-import qualified Data.Binary.Put      as Bin
-import qualified Data.ByteString      as S
-import qualified Data.ByteString.Lazy as L
+import Data.Binary.Compat.Put hiding (runPut,runPutM)
+import qualified Data.Binary.Compat.Put as Bin
+import qualified Data.ByteString        as S
+import qualified Data.ByteString.Lazy   as L
 
 
 runPut :: Put -> S.ByteString

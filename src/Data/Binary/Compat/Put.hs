@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Binary.Put (
+module Data.Binary.Compat.Put (
 
     -- * The Put type
       Put
@@ -50,8 +50,8 @@ module Data.Binary.Put (
   ) where
 
 import Data.Monoid
-import Data.Binary.Builder (Builder, toLazyByteString)
-import qualified Data.Binary.Builder as B
+import Data.Binary.Compat.Builder (Builder, toLazyByteString)
+import qualified Data.Binary.Compat.Builder as B
 
 import Data.Word
 import qualified Data.ByteString      as S

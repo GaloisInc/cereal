@@ -1,4 +1,4 @@
-module Data.Binary.Get (
+module Data.Binary.Compat.Get (
     -- * The Get type
       Get
     , runGet
