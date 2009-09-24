@@ -66,14 +66,14 @@ import Data.Char    (chr,ord)
 import Data.List    (unfoldr)
 
 -- And needed for the instances:
-import qualified Data.ByteString as B
-import qualified Data.Map        as Map
-import qualified Data.Set        as Set
-import qualified Data.IntMap     as IntMap
-import qualified Data.IntSet     as IntSet
-import qualified Data.Ratio      as R
-
-import qualified Data.Tree as T
+import qualified Data.ByteString      as B
+import qualified Data.ByteString.Lazy as L
+import qualified Data.Map             as Map
+import qualified Data.Set             as Set
+import qualified Data.IntMap          as IntMap
+import qualified Data.IntSet          as IntSet
+import qualified Data.Ratio           as R
+import qualified Data.Tree            as T
 
 import Data.Array.Unboxed
 
@@ -509,6 +509,11 @@ instance Binary B.ByteString where
     put bs = do put (B.length bs)
                 putByteString bs
     get    = get >>= getByteString
+
+instance Binary L.ByteString where
+    put bs = do put (fromIntegral (L.length bs) :: Int)
+                putLazyByteString bs
+    get    = get >>= getLazyByteString
 
 
 ------------------------------------------------------------------------

@@ -48,6 +48,7 @@ module Data.Binary.Safe.Get (
     -- ** ByteStrings
     , getByteString
     , getRemaining
+    , getLazyByteString
 
     -- ** Big-endian reads
     , getWord16be
@@ -71,7 +72,8 @@ import Control.Monad (unless,when,ap,MonadPlus(..))
 import Data.List (intercalate)
 import Data.Maybe (isNothing)
 
-import qualified Data.ByteString as B
+import qualified Data.ByteString      as B
+import qualified Data.ByteString.Lazy as L
 
 #ifdef BYTESTRING_IN_BASE
 import qualified Data.ByteString.Base as B
@@ -251,6 +253,10 @@ getByteString n = readN n id
 
 getRemaining :: Get B.ByteString
 getRemaining  = getByteString =<< remaining
+
+getLazyByteString :: Int64 -> Get L.ByteString
+getLazyByteString n = readN (fromIntegral n) f
+  where f bs = L.fromChunks [bs]
 
 
 ------------------------------------------------------------------------
