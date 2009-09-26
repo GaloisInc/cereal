@@ -56,20 +56,12 @@ module Data.Serialize.Builder (
 
   ) where
 
-import Foreign
 import Data.Monoid
-import Data.Word
-import qualified Data.ByteString      as S
-import qualified Data.ByteString.Lazy as L
-
-#ifdef BYTESTRING_IN_BASE
-import Data.ByteString.Base (inlinePerformIO)
-import qualified Data.ByteString.Base as S
-#else
-import Data.ByteString.Internal (inlinePerformIO)
-import qualified Data.ByteString.Internal as S
+import Foreign
+import qualified Data.ByteString               as S
+import qualified Data.ByteString.Lazy          as L
+import qualified Data.ByteString.Internal      as S
 import qualified Data.ByteString.Lazy.Internal as L
-#endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base
@@ -78,6 +70,8 @@ import GHC.Word (Word32(..),Word16(..),Word64(..))
 #if WORD_SIZE_IN_BITS < 64 && __GLASGOW_HASKELL__ >= 608
 import GHC.Word (uncheckedShiftRL64#)
 #endif
+#else
+import Data.Word
 #endif
 
 ------------------------------------------------------------------------
@@ -100,9 +94,7 @@ newtype Builder = Builder {
 
 instance Monoid Builder where
     mempty  = empty
-    {-# INLINE mempty #-}
     mappend = append
-    {-# INLINE mappend #-}
 
 ------------------------------------------------------------------------
 
@@ -112,7 +104,6 @@ instance Monoid Builder where
 --
 empty :: Builder
 empty = Builder id
-{-# INLINE empty #-}
 
 -- | /O(1)./ A Builder taking a single byte, satisfying
 --
@@ -120,7 +111,6 @@ empty = Builder id
 --
 singleton :: Word8 -> Builder
 singleton = writeN 1 . flip poke
-{-# INLINE singleton #-}
 
 ------------------------------------------------------------------------
 
@@ -131,7 +121,6 @@ singleton = writeN 1 . flip poke
 --
 append :: Builder -> Builder -> Builder
 append (Builder f) (Builder g) = Builder (f . g)
-{-# INLINE append #-}
 
 -- | /O(1)./ A Builder taking a 'S.ByteString', satisfying
 --
@@ -141,7 +130,6 @@ fromByteString :: S.ByteString -> Builder
 fromByteString bs
   | S.null bs = empty
   | otherwise = flush `append` mapBuilder (bs :)
-{-# INLINE fromByteString #-}
 
 -- | /O(1)./ A Builder taking a lazy 'L.ByteString', satisfying
 --
@@ -149,7 +137,6 @@ fromByteString bs
 --
 fromLazyByteString :: L.ByteString -> Builder
 fromLazyByteString bss = flush `append` mapBuilder (L.toChunks bss ++)
-{-# INLINE fromLazyByteString #-}
 
 ------------------------------------------------------------------------
 
@@ -195,10 +182,9 @@ defaultSize = 32 * k - overhead
 
 -- | Sequence an IO operation on the buffer
 unsafeLiftIO :: (Buffer -> IO Buffer) -> Builder
-unsafeLiftIO f =  Builder $ \ k buf -> inlinePerformIO $ do
+unsafeLiftIO f =  Builder $ \ k buf -> S.inlinePerformIO $ do
     buf' <- f buf
     return (k buf')
-{-# INLINE unsafeLiftIO #-}
 
 -- | Get the size of the buffer
 withSize :: (Int -> Builder) -> Builder
@@ -216,25 +202,21 @@ ensureFree :: Int -> Builder
 ensureFree n = n `seq` withSize $ \ l ->
     if n <= l then empty else
         flush `append` unsafeLiftIO (const (newBuffer (max n defaultSize)))
-{-# INLINE ensureFree #-}
 
 -- | Ensure that @n@ many bytes are available, and then use @f@ to write some
 -- bytes into the memory.
 writeN :: Int -> (Ptr Word8 -> IO ()) -> Builder
 writeN n f = ensureFree n `append` unsafeLiftIO (writeNBuffer n f)
-{-# INLINE writeN #-}
 
 writeNBuffer :: Int -> (Ptr Word8 -> IO ()) -> Buffer -> IO Buffer
 writeNBuffer n f (Buffer fp o u l) = do
     withForeignPtr fp (\p -> f (p `plusPtr` (o+u)))
     return (Buffer fp o (u+n) (l-n))
-{-# INLINE writeNBuffer #-}
 
 newBuffer :: Int -> IO Buffer
 newBuffer size = do
     fp <- S.mallocByteString size
     return $! Buffer fp 0 0 size
-{-# INLINE newBuffer #-}
 
 ------------------------------------------------------------------------
 -- Aligned, host order writes of storable values
@@ -243,13 +225,11 @@ newBuffer size = do
 -- storable values into the memory.
 writeNbytes :: Storable a => Int -> (Ptr a -> IO ()) -> Builder
 writeNbytes n f = ensureFree n `append` unsafeLiftIO (writeNBufferBytes n f)
-{-# INLINE writeNbytes #-}
 
 writeNBufferBytes :: Storable a => Int -> (Ptr a -> IO ()) -> Buffer -> IO Buffer
 writeNBufferBytes n f (Buffer fp o u l) = do
     withForeignPtr fp (\p -> f (p `plusPtr` (o+u)))
     return (Buffer fp o (u+n) (l-n))
-{-# INLINE writeNBufferBytes #-}
 
 ------------------------------------------------------------------------
 
@@ -263,14 +243,12 @@ putWord16be :: Word16 -> Builder
 putWord16be w = writeN 2 $ \p -> do
     poke p               (fromIntegral (shiftr_w16 w 8) :: Word8)
     poke (p `plusPtr` 1) (fromIntegral (w)              :: Word8)
-{-# INLINE putWord16be #-}
 
 -- | Write a Word16 in little endian format
 putWord16le :: Word16 -> Builder
 putWord16le w = writeN 2 $ \p -> do
     poke p               (fromIntegral (w)              :: Word8)
     poke (p `plusPtr` 1) (fromIntegral (shiftr_w16 w 8) :: Word8)
-{-# INLINE putWord16le #-}
 
 -- putWord16le w16 = writeN 2 (\p -> poke (castPtr p) w16)
 
@@ -281,7 +259,6 @@ putWord32be w = writeN 4 $ \p -> do
     poke (p `plusPtr` 1) (fromIntegral (shiftr_w32 w 16) :: Word8)
     poke (p `plusPtr` 2) (fromIntegral (shiftr_w32 w  8) :: Word8)
     poke (p `plusPtr` 3) (fromIntegral (w)               :: Word8)
-{-# INLINE putWord32be #-}
 
 --
 -- a data type to tag Put/Check. writes construct these which are then
@@ -295,7 +272,6 @@ putWord32le w = writeN 4 $ \p -> do
     poke (p `plusPtr` 1) (fromIntegral (shiftr_w32 w  8) :: Word8)
     poke (p `plusPtr` 2) (fromIntegral (shiftr_w32 w 16) :: Word8)
     poke (p `plusPtr` 3) (fromIntegral (shiftr_w32 w 24) :: Word8)
-{-# INLINE putWord32le #-}
 
 -- on a little endian machine:
 -- putWord32le w32 = writeN 4 (\p -> poke (castPtr p) w32)
@@ -330,7 +306,6 @@ putWord64be w = writeN 8 $ \p -> do
     poke (p `plusPtr` 6) (fromIntegral (shiftr_w64 w  8) :: Word8)
     poke (p `plusPtr` 7) (fromIntegral (w)               :: Word8)
 #endif
-{-# INLINE putWord64be #-}
 
 -- | Write a Word64 in little endian format
 putWord64le :: Word64 -> Builder

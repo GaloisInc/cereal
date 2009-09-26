@@ -453,6 +453,11 @@ getListOf m = go [] =<< getWord64be
 getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
 getIArrayOf ix e = liftM2 listArray (getTwoOf ix ix) (getListOf e)
 
+-- | Get a sequence in the following format:
+--   Word64 (big endian format)
+--   element 1
+--   ...
+--   element n
 getSeqOf :: Get a -> Get (Seq.Seq a)
 getSeqOf m = go Seq.empty =<< getWord64be
   where

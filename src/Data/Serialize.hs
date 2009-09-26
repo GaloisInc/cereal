@@ -23,6 +23,7 @@ module Data.Serialize (
     -- * The Get and Put monads
     , Get
     , Put
+    , Putter
 
     -- * Useful helpers for writing instances
     , putWord8
@@ -63,7 +64,7 @@ import qualified Data.Foldable        as Fold
 
 class Serialize t where
     -- | Encode a value in the Put monad.
-    put :: t -> Put
+    put :: Putter t
     -- | Decode a value in the Get monad
     get :: Get t
 
@@ -73,7 +74,7 @@ class Serialize t where
 -- | Encode a value using binary serialisation to a lazy ByteString.
 --
 encode :: Serialize a => a -> ByteString
-encode = B.concat . L.toChunks . runPut . put
+encode = runPut . put
 
 -- | Decode a value from a lazy ByteString, reconstructing the original structure.
 --
@@ -345,8 +346,8 @@ instance (Ord a, Serialize a) => Serialize (Set.Set a) where
     get   = getSetOf get
 
 instance (Ord k, Serialize k, Serialize e) => Serialize (Map.Map k e) where
-    put m = put (Map.size m) >> mapM_ put (Map.toAscList m)
-    get   = getMapOf get get
+    put = putMapOf put put
+    get = getMapOf get get
 
 instance Serialize IntSet.IntSet where
     put s = put (IntSet.size s) >> mapM_ put (IntSet.toAscList s)
@@ -378,17 +379,14 @@ instance Serialize Float where
 -- Trees
 
 instance (Serialize e) => Serialize (T.Tree e) where
-    put (T.Node r s) = put r >> put s
+    put = putTreeOf put
     get = getTreeOf get
 
 ------------------------------------------------------------------------
 -- Arrays
 
 instance (Serialize i, Ix i, Serialize e) => Serialize (Array i e) where
-    put a = do
-        put (bounds a)
-        put (rangeSize $ bounds a) -- write the length
-        mapM_ put (elems a)        -- now the elems.
+    put = putIArrayOf put put
     get = getIArrayOf get get
 
 --
@@ -396,8 +394,5 @@ instance (Serialize i, Ix i, Serialize e) => Serialize (Array i e) where
 --
 instance (Serialize i, Ix i, Serialize e, IArray UArray e)
   => Serialize (UArray i e) where
-    put a = do
-        put (bounds a)
-        put (rangeSize $ bounds a) -- now write the length
-        mapM_ put (elems a)
+    put = putIArrayOf put put
     get = getIArrayOf get get

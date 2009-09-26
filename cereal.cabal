@@ -39,14 +39,10 @@ library
                 build-depends: base < 2.0
         hs-source-dirs:  src
 
-        exposed-modules:Data.Binary.Safe,
-                        Data.Binary.Safe.Put,
-                        Data.Binary.Safe.Get,
-
-                        Data.Binary.Compat,
-                        Data.Binary.Compat.Builder,
-                        Data.Binary.Compat.Get,
-                        Data.Binary.Compat.Put
+        exposed-modules:Data.Serialize,
+                        Data.Serialize.Put,
+                        Data.Serialize.Get
+        other-modules:  Data.Serialize.Builder
 
         extensions:     CPP,
                         FlexibleContexts,
