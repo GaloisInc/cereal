@@ -120,7 +120,6 @@ newtype Get a = Get
 instance Functor Get where
     fmap p m = Get (\t s0 f k -> unGet m t s0 f (\s a -> k s (p a)))
 
-
 instance Applicative Get where
     pure  = return
     (<*>) = ap
@@ -137,7 +136,6 @@ instance Monad Get where
 
 instance MonadPlus Get where
     mzero = failDesc "mzero"
-
     mplus a b = Get (\t s0 f k -> unGet a t s0 (\_ -> unGet b t s0 f k) k)
 
 ------------------------------------------------------------------------
@@ -201,7 +199,10 @@ failDesc err = do
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
-skip n = readN n (const ())
+skip n = do
+  s <- get
+  when (B.length s < n) (fail "too few bytes")
+  put (B.drop n s)
 
 -- | Skip ahead @n@ bytes. No error if there isn't enough bytes.
 uncheckedSkip :: Int -> Get ()
@@ -265,16 +266,13 @@ isEmpty = B.null `fmap` get
 -- than @n@ bytes are left in the input.
 getByteString :: Int -> Get B.ByteString
 getByteString n = readN n id
-{-# INLINE getByteString #-}
 
 getRemaining :: Get B.ByteString
 getRemaining  = getByteString =<< remaining
-{-# INLINE getRemaining #-}
 
 getLazyByteString :: Int64 -> Get L.ByteString
 getLazyByteString n = readN (fromIntegral n) f
   where f bs = L.fromChunks [bs]
-{-# INLINE getLazyByteString #-}
 
 
 ------------------------------------------------------------------------
@@ -285,18 +283,16 @@ getBytes :: Int -> Get B.ByteString
 getBytes n = do
     s <- get
     let left = B.length s
-    when (n > left) (fail ("too few bytes"))
+    when (n > left) (fail "too few bytes")
     let (consume,rest) = B.splitAt n s
     put rest
     return consume
-{-# INLINE getBytes #-}
 
 -- Pull n bytes from the input, and apply a parser to those bytes,
 -- yielding a value. If less than @n@ bytes are available, fail with an
 -- error. This wraps @getBytes@.
 readN :: Int -> (B.ByteString -> a) -> Get a
 readN n f = f `fmap` getBytes n
-{-# INLINE readN #-}
 
 ------------------------------------------------------------------------
 -- Primtives
@@ -309,14 +305,12 @@ getPtr :: Storable a => Int -> Get a
 getPtr n = do
     (fp,o,_) <- readN n B.toForeignPtr
     return . B.inlinePerformIO $ withForeignPtr fp $ \p -> peek (castPtr $ p `plusPtr` o)
-{-# INLINE getPtr #-}
 
 ------------------------------------------------------------------------
 
 -- | Read a Word8 from the monad state
 getWord8 :: Get Word8
 getWord8 = getPtr (sizeOf (undefined :: Word8))
-{-# INLINE getWord8 #-}
 
 -- | Read a Word16 in big endian format
 getWord16be :: Get Word16
@@ -324,7 +318,6 @@ getWord16be = do
     s <- readN 2 id
     return $! (fromIntegral (s `B.index` 0) `shiftl_w16` 8) .|.
               (fromIntegral (s `B.index` 1))
-{-# INLINE getWord16be #-}
 
 -- | Read a Word16 in little endian format
 getWord16le :: Get Word16
@@ -332,7 +325,6 @@ getWord16le = do
     s <- readN 2 id
     return $! (fromIntegral (s `B.index` 1) `shiftl_w16` 8) .|.
               (fromIntegral (s `B.index` 0) )
-{-# INLINE getWord16le #-}
 
 -- | Read a Word32 in big endian format
 getWord32be :: Get Word32
@@ -342,7 +334,6 @@ getWord32be = do
               (fromIntegral (s `B.index` 1) `shiftl_w32` 16) .|.
               (fromIntegral (s `B.index` 2) `shiftl_w32`  8) .|.
               (fromIntegral (s `B.index` 3) )
-{-# INLINE getWord32be #-}
 
 -- | Read a Word32 in little endian format
 getWord32le :: Get Word32
@@ -352,7 +343,6 @@ getWord32le = do
               (fromIntegral (s `B.index` 2) `shiftl_w32` 16) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w32`  8) .|.
               (fromIntegral (s `B.index` 0) )
-{-# INLINE getWord32le #-}
 
 -- | Read a Word64 in big endian format
 getWord64be :: Get Word64
@@ -366,7 +356,6 @@ getWord64be = do
               (fromIntegral (s `B.index` 5) `shiftl_w64` 16) .|.
               (fromIntegral (s `B.index` 6) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.index` 7) )
-{-# INLINE getWord64be #-}
 
 -- | Read a Word64 in little endian format
 getWord64le :: Get Word64
@@ -380,7 +369,6 @@ getWord64le = do
               (fromIntegral (s `B.index` 2) `shiftl_w64` 16) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.index` 0) )
-{-# INLINE getWord64le #-}
 
 ------------------------------------------------------------------------
 -- Host-endian reads
@@ -390,22 +378,18 @@ getWord64le = do
 -- machine the Word is an 8 byte value, on a 32 bit machine, 4 bytes.
 getWordhost :: Get Word
 getWordhost = getPtr (sizeOf (undefined :: Word))
-{-# INLINE getWordhost #-}
 
 -- | /O(1)./ Read a 2 byte Word16 in native host order and host endianness.
 getWord16host :: Get Word16
 getWord16host = getPtr (sizeOf (undefined :: Word16))
-{-# INLINE getWord16host #-}
 
 -- | /O(1)./ Read a Word32 in native host order and host endianness.
 getWord32host :: Get Word32
 getWord32host = getPtr  (sizeOf (undefined :: Word32))
-{-# INLINE getWord32host #-}
 
 -- | /O(1)./ Read a Word64 in native host order and host endianess.
 getWord64host   :: Get Word64
 getWord64host = getPtr  (sizeOf (undefined :: Word64))
-{-# INLINE getWord64host #-}
 
 ------------------------------------------------------------------------
 -- Unchecked shifts
@@ -442,7 +426,6 @@ shiftl_w64 = shiftL
 
 getTwoOf :: Get a -> Get b -> Get (a,b)
 getTwoOf ma mb = liftM2 (,) ma mb
-{-# INLINE getTwoOf #-}
 
 -- | Get a list in the following format:
 --   Word64 (big endian format)
@@ -455,7 +438,6 @@ getListOf m = go [] =<< getWord64be
   go as 0 = return (reverse as)
   go as i = do x <- m
                x `seq` go (x:as) (i - 1)
-{-# INLINE getListOf #-}
 
 -- | Get an IArray in the following format:
 --   index (lower bound)
@@ -466,7 +448,6 @@ getListOf m = go [] =<< getWord64be
 --   element n
 getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
 getIArrayOf ix e = liftM2 listArray (getTwoOf ix ix) (getListOf e)
-{-# INLINE getIArrayOf #-}
 
 -- | Get a sequence in the following format:
 --   Word64 (big endian format)
@@ -480,32 +461,26 @@ getSeqOf m = go Seq.empty =<< getWord64be
   go xs n = xs `seq` n `seq` do
               x <- m
               go (xs Seq.|> x) (n - 1)
-{-# INLINE getSeqOf #-}
 
 -- | Read as a list of lists.
 getTreeOf :: Get a -> Get (T.Tree a)
 getTreeOf m = liftM2 T.Node m (getListOf (getTreeOf m))
-{-# INLINE getTreeOf #-}
 
 -- | Read as a list of pairs of key and element.
 getMapOf :: Ord k => Get k -> Get a -> Get (Map.Map k a)
 getMapOf k m = Map.fromDistinctAscList `fmap` getListOf (getTwoOf k m)
-{-# INLINE getMapOf #-}
 
 -- | Read as a list of pairs of int and element.
 getIntMapOf :: Get Int -> Get a -> Get (IntMap.IntMap a)
 getIntMapOf i m = IntMap.fromDistinctAscList `fmap` getListOf (getTwoOf i m)
-{-# INLINE getIntMapOf #-}
 
 -- | Read as a list of elements.
 getSetOf :: Ord a => Get a -> Get (Set.Set a)
 getSetOf m = Set.fromDistinctAscList `fmap` getListOf m
-{-# INLINE getSetOf #-}
 
 -- | Read as a list of ints.
 getIntSetOf :: Get Int -> Get IntSet.IntSet
 getIntSetOf m = IntSet.fromDistinctAscList `fmap` getListOf m
-{-# INLINE getIntSetOf #-}
 
 -- | Read in a Maybe in the following format:
 --   Word8 (0 for Nothing, anything else for Just)
