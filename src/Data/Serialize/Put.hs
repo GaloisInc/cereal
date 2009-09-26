@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Serialize.Put
--- Copyright   : Lennart Kolmodin
+-- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
 -- 
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
@@ -54,6 +54,11 @@ module Data.Serialize.Put (
     , putSeqOf
     , putTreeOf
     , putMapOf
+    , putIntMapOf
+    , putSetOf
+    , putIntSetOf
+    , putMaybeOf
+    , putEitherOf
 
   ) where
 
@@ -67,8 +72,11 @@ import Data.Monoid
 import Data.Word
 import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
+import qualified Data.IntMap            as IntMap
+import qualified Data.IntSet            as IntSet
 import qualified Data.Map               as Map
 import qualified Data.Sequence          as Seq
+import qualified Data.Set               as Set
 import qualified Data.Tree              as T
 
 
@@ -232,3 +240,20 @@ putTreeOf pa (T.Node r s) = pa r >> putListOf (putTreeOf pa) s
 
 putMapOf :: Ord k => Putter k -> Putter a -> Putter (Map.Map k a)
 putMapOf pk pa = putListOf (putTwoOf pk pa) . Map.toAscList
+
+putIntMapOf :: Putter Int -> Putter a -> Putter (IntMap.IntMap a)
+putIntMapOf pix pa = putListOf (putTwoOf pix pa) . IntMap.toAscList
+
+putSetOf :: Putter a -> Putter (Set.Set a)
+putSetOf pa = putListOf pa . Set.toAscList
+
+putIntSetOf :: Putter Int -> Putter IntSet.IntSet
+putIntSetOf pix = putListOf pix . IntSet.toAscList
+
+putMaybeOf :: Putter a -> Putter (Maybe a)
+putMaybeOf _  Nothing  = putWord8 0
+putMaybeOf pa (Just a) = putWord8 1 >> pa a
+
+putEitherOf :: Putter a -> Putter b -> Putter (Either a b)
+putEitherOf pa _  (Left a)  = putWord8 0 >> pa a
+putEitherOf _  pb (Right b) = putWord8 1 >> pb b

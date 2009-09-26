@@ -58,7 +58,6 @@ import qualified Data.IntSet          as IntSet
 import qualified Data.Ratio           as R
 import qualified Data.Tree            as T
 import qualified Data.Sequence        as Seq
-import qualified Data.Foldable        as Fold
 
 ------------------------------------------------------------------------
 
@@ -315,13 +314,11 @@ instance Serialize a => Serialize [a] where
     get    = getListOf get
 
 instance (Serialize a) => Serialize (Maybe a) where
-    put Nothing  = putWord8 0
-    put (Just x) = putWord8 1 >> put x
+    put = putMaybeOf put
     get = getMaybeOf get
 
 instance (Serialize a, Serialize b) => Serialize (Either a b) where
-    put (Left  a) = putWord8 0 >> put a
-    put (Right b) = putWord8 1 >> put b
+    put = putEitherOf put put
     get = getEitherOf get get
 
 ------------------------------------------------------------------------
@@ -342,27 +339,27 @@ instance Serialize L.ByteString where
 -- Maps and Sets
 
 instance (Ord a, Serialize a) => Serialize (Set.Set a) where
-    put s = put (Set.size s) >> mapM_ put (Set.toAscList s)
-    get   = getSetOf get
+    put = putSetOf put
+    get = getSetOf get
 
 instance (Ord k, Serialize k, Serialize e) => Serialize (Map.Map k e) where
     put = putMapOf put put
     get = getMapOf get get
 
 instance Serialize IntSet.IntSet where
-    put s = put (IntSet.size s) >> mapM_ put (IntSet.toAscList s)
-    get   = getIntSetOf get
+    put = putIntSetOf put
+    get = getIntSetOf get
 
 instance (Serialize e) => Serialize (IntMap.IntMap e) where
-    put m = put (IntMap.size m) >> mapM_ put (IntMap.toAscList m)
-    get   = getIntMapOf get get
+    put = putIntMapOf put put
+    get = getIntMapOf get get
 
 ------------------------------------------------------------------------
 -- Queues and Sequences
 
 instance (Serialize e) => Serialize (Seq.Seq e) where
-    put s = put (Seq.length s) >> Fold.mapM_ put s
-    get   = getSeqOf get
+    put = putSeqOf put
+    get = getSeqOf get
 
 ------------------------------------------------------------------------
 -- Floating point
