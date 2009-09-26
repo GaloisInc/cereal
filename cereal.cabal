@@ -41,8 +41,8 @@ library
 
         exposed-modules:Data.Serialize,
                         Data.Serialize.Put,
-                        Data.Serialize.Get
-        other-modules:  Data.Serialize.Builder
+                        Data.Serialize.Get,
+                        Data.Serialize.Builder
 
         extensions:     CPP,
                         FlexibleContexts,
