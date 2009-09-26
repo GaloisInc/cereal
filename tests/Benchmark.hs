@@ -1,10 +1,10 @@
-{-# OPTIONS -fbang-patterns #-}
+{-# LANGUAGE BangPatterns #-}
 module Main (main) where
 
-import qualified Data.ByteString as B
-import Data.Binary.Safe
-import Data.Binary.Safe.Put
-import Data.Binary.Safe.Get
+import qualified Data.ByteString as L
+import Data.Serialize
+import Data.Serialize.Put
+import Data.Serialize.Get
 
 import Control.Exception
 import System.CPUTime
@@ -66,8 +66,9 @@ test wordSize chunkSize end mb = do
     printf "%dMB of Word%-2d in chunks of %2d (%6s endian): "
         (mb :: Int) (8 * wordSize :: Int) (chunkSize :: Int) (show end)
 
-    putSeconds <- time $ evaluate (B.length bs)
+    putSeconds <- time $ evaluate (L.length bs)
     getSeconds <- time $ evaluate sum
+--    print (L.length bs, sum)
     let putThroughput = fromIntegral mb / putSeconds
         getThroughput = fromIntegral mb / getSeconds
 
