@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Compat.Put
+-- Module      : Data.Serialize.Put
 -- Copyright   : Lennart Kolmodin
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Binary.Compat.Put (
+module Data.Serialize.Put (
 
     -- * The Put type
       Put
@@ -50,8 +50,8 @@ module Data.Binary.Compat.Put (
   ) where
 
 import Data.Monoid
-import Data.Binary.Compat.Builder (Builder, toLazyByteString)
-import qualified Data.Binary.Compat.Builder as B
+import Data.Serialize.Builder (Builder, toLazyByteString)
+import qualified Data.Serialize.Builder as B
 
 import Data.Word
 import qualified Data.ByteString      as S

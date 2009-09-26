@@ -4,7 +4,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Safe.Get
+-- Module      : Data.Serialize.Get
 -- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -21,7 +21,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.Binary.Safe.Get (
+module Data.Serialize.Get (
 
     -- * The Get type
       Get
@@ -66,23 +66,41 @@ module Data.Binary.Safe.Get (
     , getWord32host
     , getWord64host
 
+    -- ** Containers
+    , getTwoOf
+    , getListOf
+    , getIArrayOf
+    , getTreeOf
+    , getSeqOf
+    , getMapOf
+    , getIntMapOf
+    , getSetOf
+    , getIntSetOf
+    , getMaybeOf
+    , getEitherOf
+
   ) where
 
-import Control.Monad (unless,when,ap,MonadPlus(..))
+import Control.Applicative (Applicative(..),Alternative(..))
+import Control.Monad (unless,when,ap,MonadPlus(..),liftM2)
+import Data.Array.IArray (IArray,listArray)
+import Data.Ix (Ix)
 import Data.List (intercalate)
 import Data.Maybe (isNothing)
 
 import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as L
+import qualified Data.IntMap          as IntMap
+import qualified Data.IntSet          as IntSet
+import qualified Data.Map             as Map
+import qualified Data.Sequence        as Seq
+import qualified Data.Set             as Set
+import qualified Data.Tree            as T
 
 #ifdef BYTESTRING_IN_BASE
 import qualified Data.ByteString.Base as B
 #else
 import qualified Data.ByteString.Internal as B
-#endif
-
-#ifdef APPLICATIVE_IN_BASE
-import Control.Applicative (Applicative(..))
 #endif
 
 import Foreign
@@ -108,11 +126,13 @@ instance Functor Get where
     fmap p m = Get (\t s0 f k -> unGet m t s0 f (\s a -> k s (p a)))
 
 
-#ifdef APPLICATIVE_IN_BASE
 instance Applicative Get where
     pure  = return
     (<*>) = ap
-#endif
+
+instance Alternative Get where
+    empty = failDesc "empty"
+    (<|>) = mplus
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
@@ -404,3 +424,79 @@ shiftl_w16 = shiftL
 shiftl_w32 = shiftL
 shiftl_w64 = shiftL
 #endif
+
+
+-- Containers ------------------------------------------------------------------
+
+getTwoOf :: Get a -> Get b -> Get (a,b)
+getTwoOf ma mb = liftM2 (,) ma mb
+
+-- | Get a list in the following format:
+--   Word64 (big endian format)
+--   element 1
+--   ...
+--   element n
+getListOf :: Get a -> Get [a]
+getListOf m = go [] =<< getWord64be
+  where
+  go as 0 = return (reverse as)
+  go as i = do x <- m
+               x `seq` go (x:as) (i - 1)
+
+-- | Get an IArray in the following format:
+--   index (lower bound)
+--   index (upper bound)
+--   Word64 (big endian format)
+--   element 1
+--   ...
+--   element n
+getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
+getIArrayOf ix e = liftM2 listArray (getTwoOf ix ix) (getListOf e)
+
+getSeqOf :: Get a -> Get (Seq.Seq a)
+getSeqOf m = go Seq.empty =<< getWord64be
+  where
+  go xs 0 = return $! xs
+  go xs n = xs `seq` n `seq` do
+              x <- m
+              go (xs Seq.|> x) (n - 1)
+
+-- | Read as a list of lists.
+getTreeOf :: Get a -> Get (T.Tree a)
+getTreeOf m = liftM2 T.Node m (getListOf (getTreeOf m))
+
+-- | Read as a list of pairs of key and element.
+getMapOf :: Ord k => Get k -> Get a -> Get (Map.Map k a)
+getMapOf k m = Map.fromDistinctAscList `fmap` getListOf (getTwoOf k m)
+
+-- | Read as a list of pairs of int and element.
+getIntMapOf :: Get Int -> Get a -> Get (IntMap.IntMap a)
+getIntMapOf i m = IntMap.fromDistinctAscList `fmap` getListOf (getTwoOf i m)
+
+-- | Read as a list of elements.
+getSetOf :: Ord a => Get a -> Get (Set.Set a)
+getSetOf m = Set.fromDistinctAscList `fmap` getListOf m
+
+-- | Read as a list of ints.
+getIntSetOf :: Get Int -> Get IntSet.IntSet
+getIntSetOf m = IntSet.fromDistinctAscList `fmap` getListOf m
+
+-- | Read in a Maybe in the following format:
+--   Word8 (0 for Nothing, anything else for Just)
+--   element (when Just)
+getMaybeOf :: Get a -> Get (Maybe a)
+getMaybeOf m = do
+  tag <- getWord8
+  case tag of
+    0 -> return Nothing
+    _ -> Just `fmap` m
+
+-- | Read an Either, in the following format:
+--   Word8 (0 for Left, anything else for Right)
+--   element a when 0, element b otherwise
+getEitherOf :: Get a -> Get b -> Get (Either a b)
+getEitherOf ma mb = do
+  tag <- getWord8
+  case tag of
+    0 -> Left  `fmap` ma
+    _ -> Right `fmap` mb

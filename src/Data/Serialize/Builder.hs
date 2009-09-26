@@ -4,7 +4,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      : Data.Binary.Compat.Builder
+-- Module      : Data.Serialize.Builder
 -- Copyright   : Lennart Kolmodin, Ross Paterson, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
 -- 
@@ -20,7 +20,7 @@
 #include "MachDeps.h"
 #endif
 
-module Data.Binary.Compat.Builder (
+module Data.Serialize.Builder (
 
     -- * The Builder type
       Builder
