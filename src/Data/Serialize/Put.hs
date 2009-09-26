@@ -98,44 +98,58 @@ type Putter a = a -> Put
 
 instance Functor PutM where
         fmap f m = Put $ let PairS a w = unPut m in PairS (f a) w
+        {-# INLINE fmap #-}
+
 
 instance Applicative PutM where
         pure    = return
+        {-# INLINE pure #-}
+
         m <*> k = Put $
             let PairS f w  = unPut m
                 PairS x w' = unPut k
             in PairS (f x) (w `mappend` w')
+        {-# INLINE (<*>) #-}
+
 
 instance Monad PutM where
     return a = Put (PairS a mempty)
+    {-# INLINE return #-}
 
     m >>= k  = Put $
         let PairS a w  = unPut m
             PairS b w' = unPut (k a)
         in PairS b (w `mappend` w')
+    {-# INLINE (>>=) #-}
 
     m >> k  = Put $
         let PairS _ w  = unPut m
             PairS b w' = unPut k
         in PairS b (w `mappend` w')
+    {-# INLINE (>>) #-}
 
 tell :: Putter Builder
 tell b = Put $ PairS () b
+{-# INLINE tell #-}
 
 putBuilder :: Putter Builder
 putBuilder = tell
+{-# INLINE putBuilder #-}
 
 -- | Run the 'Put' monad
 execPut :: PutM a -> Builder
 execPut = sndS . unPut
+{-# INLINE execPut #-}
 
 -- | Run the 'Put' monad with a serialiser
 runPut :: Put -> S.ByteString
 runPut = toByteString . sndS . unPut
+{-# INLINE runPut #-}
 
 -- | Run the 'Put' monad with a serialiser and get its result
 runPutM :: PutM a -> (a, S.ByteString)
 runPutM (Put (PairS f s)) = (f, toByteString s)
+{-# INLINE runPutM #-}
 
 ------------------------------------------------------------------------
 
@@ -143,44 +157,54 @@ runPutM (Put (PairS f s)) = (f, toByteString s)
 -- new chunk in the result ByteString.
 flush               :: Put
 flush               = tell B.flush
+{-# INLINE flush #-}
 
 -- | Efficiently write a byte into the output buffer
 putWord8            :: Putter Word8
 putWord8            = tell . B.singleton
+{-# INLINE putWord8 #-}
 
 -- | An efficient primitive to write a strict ByteString into the output buffer.
 -- It flushes the current buffer, and writes the argument into a new chunk.
 putByteString       :: Putter S.ByteString
 putByteString       = tell . B.fromByteString
+{-# INLINE putByteString #-}
 
 -- | Write a lazy ByteString efficiently, simply appending the lazy
 -- ByteString chunks to the output buffer
 putLazyByteString   :: Putter L.ByteString
 putLazyByteString   = tell . B.fromLazyByteString
+{-# INLINE putLazyByteString #-}
 
 -- | Write a Word16 in big endian format
 putWord16be         :: Putter Word16
 putWord16be         = tell . B.putWord16be
+{-# INLINE putWord16be #-}
 
 -- | Write a Word16 in little endian format
 putWord16le         :: Putter Word16
 putWord16le         = tell . B.putWord16le
+{-# INLINE putWord16le #-}
 
 -- | Write a Word32 in big endian format
 putWord32be         :: Putter Word32
 putWord32be         = tell . B.putWord32be
+{-# INLINE putWord32be #-}
 
 -- | Write a Word32 in little endian format
 putWord32le         :: Putter Word32
 putWord32le         = tell . B.putWord32le
+{-# INLINE putWord32le #-}
 
 -- | Write a Word64 in big endian format
 putWord64be         :: Putter Word64
 putWord64be         = tell . B.putWord64be
+{-# INLINE putWord64be #-}
 
 -- | Write a Word64 in little endian format
 putWord64le         :: Putter Word64
 putWord64le         = tell . B.putWord64le
+{-# INLINE putWord64le #-}
 
 ------------------------------------------------------------------------
 
@@ -192,28 +216,33 @@ putWord64le         = tell . B.putWord64le
 --
 putWordhost         :: Putter Word
 putWordhost         = tell . B.putWordhost
+{-# INLINE putWordhost #-}
 
 -- | /O(1)./ Write a Word16 in native host order and host endianness.
 -- For portability issues see @putWordhost@.
 putWord16host       :: Putter Word16
 putWord16host       = tell . B.putWord16host
+{-# INLINE putWord16host #-}
 
 -- | /O(1)./ Write a Word32 in native host order and host endianness.
 -- For portability issues see @putWordhost@.
 putWord32host       :: Putter Word32
 putWord32host       = tell . B.putWord32host
+{-# INLINE putWord32host #-}
 
 -- | /O(1)./ Write a Word64 in native host order
 -- On a 32 bit machine we write two host order Word32s, in big endian form.
 -- For portability issues see @putWordhost@.
 putWord64host       :: Putter Word64
 putWord64host       = tell . B.putWord64host
+{-# INLINE putWord64host #-}
 
 
 -- Containers ------------------------------------------------------------------
 
 putTwoOf :: Putter a -> Putter b -> Putter (a,b)
 putTwoOf pa pb (a,b) = pa a >> pb b
+{-# INLINE putTwoOf #-}
 
 putListOf :: Putter a -> Putter [a]
 putListOf pa = go 0 (return ())
@@ -221,11 +250,13 @@ putListOf pa = go 0 (return ())
   go n body []     = putWord64be n >> body
   go n body (x:xs) = n' `seq` go n' (body >> pa x) xs
     where n' = n + 1
+{-# INLINE putListOf #-}
 
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
 putIArrayOf pix pe a = do
   putTwoOf pix pix (bounds a)
   putListOf pe (elems a)
+{-# INLINE putIArrayOf #-}
 
 putSeqOf :: Putter a -> Putter (Seq.Seq a)
 putSeqOf pa = go 0 (return ())
@@ -234,21 +265,27 @@ putSeqOf pa = go 0 (return ())
     Seq.EmptyL  -> putWord64be n >> body
     a Seq.:< as -> n' `seq` go n' (body >> pa a) as
       where n' = n + 1
+{-# INLINE putSeqOf #-}
 
 putTreeOf :: Putter a -> Putter (T.Tree a)
 putTreeOf pa (T.Node r s) = pa r >> putListOf (putTreeOf pa) s
+{-# INLINE putTreeOf #-}
 
 putMapOf :: Ord k => Putter k -> Putter a -> Putter (Map.Map k a)
 putMapOf pk pa = putListOf (putTwoOf pk pa) . Map.toAscList
+{-# INLINE putMapOf #-}
 
 putIntMapOf :: Putter Int -> Putter a -> Putter (IntMap.IntMap a)
 putIntMapOf pix pa = putListOf (putTwoOf pix pa) . IntMap.toAscList
+{-# INLINE putIntMapOf #-}
 
 putSetOf :: Putter a -> Putter (Set.Set a)
 putSetOf pa = putListOf pa . Set.toAscList
+{-# INLINE putSetOf #-}
 
 putIntSetOf :: Putter Int -> Putter IntSet.IntSet
 putIntSetOf pix = putListOf pix . IntSet.toAscList
+{-# INLINE putIntSetOf #-}
 
 putMaybeOf :: Putter a -> Putter (Maybe a)
 putMaybeOf _  Nothing  = putWord8 0
