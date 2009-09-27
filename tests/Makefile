@@ -1,34 +1,19 @@
-all: compiled
-     
-interpreted:
-	runhaskell QC.hs 1000
+GHC	= ghc -O2 -fasm -fforce-recomp
 
-compiled:
-	ghc --make -fhpc -O QC.hs -o qc -no-recomp -threaded
-	./qc 500 +RTS -qw -N2
+all: bench qc
 
 bench:: Benchmark.hs MemBench.hs CBenchmark.o
-	ghc --make -O2 -fliberate-case-threshold=1000 -fasm Benchmark.hs CBenchmark.o -o bench -fforce-recomp
-	./bench 100
-
-bench-nb::
-	ghc --make -O2 -fliberate-case-threshold=1000 NewBenchmark.hs -fasm -o bench-nb
-	./bench-nb 
+	$(GHC) -fliberate-case-threshold=1000 --make Benchmark.hs CBenchmark.o -o $@
+	./$@ 100
 
 CBenchmark.o: CBenchmark.c
 	gcc -O3 -c $< -o $@
 
-hugs:
-	runhugs -98 QC.hs  
-
-
-HeapUse: HeapUse.hs
-	ghc --make -O $^ -fasm -o $@
-
-heap: HeapUse
-	./HeapUse +RTS -M10M -t/dev/stderr -RTS
+qc: Tests.hs
+	$(GHC) --make $< -o $@
+	./$@
 
 clean:
-	rm -f *.o *.hi qc bench bench-nb *~
+	$(RM) *.o *.hi bench qc
 
 .PHONY: clean bench bench-nb
