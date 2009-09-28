@@ -259,18 +259,20 @@ instance Serialize Char where
 -- Instances for the first few tuples
 
 instance (Serialize a, Serialize b) => Serialize (a,b) where
-    put (a,b)           = put a >> put b
-    get                 = getTwoOf get get
+    put = putTwoOf put put
+    get = getTwoOf get get
 
 instance (Serialize a, Serialize b, Serialize c) => Serialize (a,b,c) where
     put (a,b,c)         = put a >> put b >> put c
     get                 = liftM3 (,,) get get get
 
-instance (Serialize a, Serialize b, Serialize c, Serialize d) => Serialize (a,b,c,d) where
+instance (Serialize a, Serialize b, Serialize c, Serialize d)
+        => Serialize (a,b,c,d) where
     put (a,b,c,d)       = put a >> put b >> put c >> put d
     get                 = liftM4 (,,,) get get get get
 
-instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e) => Serialize (a,b,c,d,e) where
+instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e)
+        => Serialize (a,b,c,d,e) where
     put (a,b,c,d,e)     = put a >> put b >> put c >> put d >> put e
     get                 = liftM5 (,,,,) get get get get get
 
@@ -278,12 +280,14 @@ instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e) => Se
 -- and now just recurse:
 --
 
-instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e, Serialize f)
+instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e
+         , Serialize f)
         => Serialize (a,b,c,d,e,f) where
     put (a,b,c,d,e,f)   = put (a,(b,c,d,e,f))
     get                 = do (a,(b,c,d,e,f)) <- get ; return (a,b,c,d,e,f)
 
-instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e, Serialize f, Serialize g)
+instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e
+         , Serialize f, Serialize g)
         => Serialize (a,b,c,d,e,f,g) where
     put (a,b,c,d,e,f,g) = put (a,(b,c,d,e,f,g))
     get                 = do (a,(b,c,d,e,f,g)) <- get ; return (a,b,c,d,e,f,g)
@@ -292,26 +296,29 @@ instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e,
           Serialize f, Serialize g, Serialize h)
         => Serialize (a,b,c,d,e,f,g,h) where
     put (a,b,c,d,e,f,g,h) = put (a,(b,c,d,e,f,g,h))
-    get                   = do (a,(b,c,d,e,f,g,h)) <- get ; return (a,b,c,d,e,f,g,h)
+    get                   = do (a,(b,c,d,e,f,g,h)) <- get
+                               return (a,b,c,d,e,f,g,h)
 
 instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e,
           Serialize f, Serialize g, Serialize h, Serialize i)
         => Serialize (a,b,c,d,e,f,g,h,i) where
     put (a,b,c,d,e,f,g,h,i) = put (a,(b,c,d,e,f,g,h,i))
-    get                     = do (a,(b,c,d,e,f,g,h,i)) <- get ; return (a,b,c,d,e,f,g,h,i)
+    get                     = do (a,(b,c,d,e,f,g,h,i)) <- get
+                                 return (a,b,c,d,e,f,g,h,i)
 
 instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e,
           Serialize f, Serialize g, Serialize h, Serialize i, Serialize j)
         => Serialize (a,b,c,d,e,f,g,h,i,j) where
     put (a,b,c,d,e,f,g,h,i,j) = put (a,(b,c,d,e,f,g,h,i,j))
-    get                       = do (a,(b,c,d,e,f,g,h,i,j)) <- get ; return (a,b,c,d,e,f,g,h,i,j)
+    get                       = do (a,(b,c,d,e,f,g,h,i,j)) <- get
+                                   return (a,b,c,d,e,f,g,h,i,j)
 
 ------------------------------------------------------------------------
 -- Container types
 
 instance Serialize a => Serialize [a] where
-    put l  = put (length l) >> mapM_ put l
-    get    = getListOf get
+    put = putListOf put
+    get = getListOf get
 
 instance (Serialize a) => Serialize (Maybe a) where
     put = putMaybeOf put
