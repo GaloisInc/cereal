@@ -156,7 +156,9 @@ data Buffer = Buffer {-# UNPACK #-} !(ForeignPtr Word8)
 ------------------------------------------------------------------------
 
 toByteString :: Builder -> S.ByteString
-toByteString  = S.concat . L.toChunks . toLazyByteString
+toByteString m = S.concat $ unsafePerformIO $ do
+  buf <- newBuffer defaultSize
+  return (runBuilder (m `append` flush) (const []) buf)
 
 -- | /O(n)./ Extract a lazy 'L.ByteString' from a 'Builder'.
 -- The construction work takes place if and when the relevant part of
