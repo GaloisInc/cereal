@@ -290,7 +290,9 @@ putIntSetOf pix = putListOf pix . IntSet.toAscList
 putMaybeOf :: Putter a -> Putter (Maybe a)
 putMaybeOf _  Nothing  = putWord8 0
 putMaybeOf pa (Just a) = putWord8 1 >> pa a
+{-# INLINE putMaybeOf #-}
 
 putEitherOf :: Putter a -> Putter b -> Putter (Either a b)
 putEitherOf pa _  (Left a)  = putWord8 0 >> pa a
 putEitherOf _  pb (Right b) = putWord8 1 >> pb b
+{-# INLINE putEitherOf #-}
