@@ -265,13 +265,13 @@ isEmpty = B.null `fmap` get
 -- | An efficient 'get' method for strict ByteStrings. Fails if fewer
 -- than @n@ bytes are left in the input.
 getByteString :: Int -> Get B.ByteString
-getByteString n = readN n id
+getByteString  = getBytes
 
 getRemaining :: Get B.ByteString
-getRemaining  = getByteString =<< remaining
+getRemaining  = getBytes =<< remaining
 
 getLazyByteString :: Int64 -> Get L.ByteString
-getLazyByteString n = readN (fromIntegral n) f
+getLazyByteString n = f `fmap` getBytes (fromIntegral n)
   where f bs = L.fromChunks [bs]
 
 
@@ -282,17 +282,10 @@ getLazyByteString n = readN (fromIntegral n) f
 getBytes :: Int -> Get B.ByteString
 getBytes n = do
     s <- get
-    let left = B.length s
-    when (n > left) (fail "too few bytes")
+    when (n > B.length s) (fail "too few bytes")
     let (consume,rest) = B.splitAt n s
     put rest
     return consume
-
--- Pull n bytes from the input, and apply a parser to those bytes,
--- yielding a value. If less than @n@ bytes are available, fail with an
--- error. This wraps @getBytes@.
-readN :: Int -> (B.ByteString -> a) -> Get a
-readN n f = f `fmap` getBytes n
 
 ------------------------------------------------------------------------
 -- Primtives
@@ -303,7 +296,7 @@ readN n f = f `fmap` getBytes n
 
 getPtr :: Storable a => Int -> Get a
 getPtr n = do
-    (fp,o,_) <- readN n B.toForeignPtr
+    (fp,o,_) <- B.toForeignPtr `fmap` getBytes n
     return . B.inlinePerformIO $ withForeignPtr fp $ \p -> peek (castPtr $ p `plusPtr` o)
 
 ------------------------------------------------------------------------
@@ -315,21 +308,21 @@ getWord8 = getPtr (sizeOf (undefined :: Word8))
 -- | Read a Word16 in big endian format
 getWord16be :: Get Word16
 getWord16be = do
-    s <- readN 2 id
+    s <- getBytes 2
     return $! (fromIntegral (s `B.index` 0) `shiftl_w16` 8) .|.
               (fromIntegral (s `B.index` 1))
 
 -- | Read a Word16 in little endian format
 getWord16le :: Get Word16
 getWord16le = do
-    s <- readN 2 id
+    s <- getBytes 2
     return $! (fromIntegral (s `B.index` 1) `shiftl_w16` 8) .|.
               (fromIntegral (s `B.index` 0) )
 
 -- | Read a Word32 in big endian format
 getWord32be :: Get Word32
 getWord32be = do
-    s <- readN 4 id
+    s <- getBytes 4
     return $! (fromIntegral (s `B.index` 0) `shiftl_w32` 24) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w32` 16) .|.
               (fromIntegral (s `B.index` 2) `shiftl_w32`  8) .|.
@@ -338,7 +331,7 @@ getWord32be = do
 -- | Read a Word32 in little endian format
 getWord32le :: Get Word32
 getWord32le = do
-    s <- readN 4 id
+    s <- getBytes 4
     return $! (fromIntegral (s `B.index` 3) `shiftl_w32` 24) .|.
               (fromIntegral (s `B.index` 2) `shiftl_w32` 16) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w32`  8) .|.
@@ -347,7 +340,7 @@ getWord32le = do
 -- | Read a Word64 in big endian format
 getWord64be :: Get Word64
 getWord64be = do
-    s <- readN 8 id
+    s <- getBytes 8
     return $! (fromIntegral (s `B.index` 0) `shiftl_w64` 56) .|.
               (fromIntegral (s `B.index` 1) `shiftl_w64` 48) .|.
               (fromIntegral (s `B.index` 2) `shiftl_w64` 40) .|.
@@ -360,7 +353,7 @@ getWord64be = do
 -- | Read a Word64 in little endian format
 getWord64le :: Get Word64
 getWord64le = do
-    s <- readN 8 id
+    s <- getBytes 8
     return $! (fromIntegral (s `B.index` 7) `shiftl_w64` 56) .|.
               (fromIntegral (s `B.index` 6) `shiftl_w64` 48) .|.
               (fromIntegral (s `B.index` 5) `shiftl_w64` 40) .|.
