@@ -154,7 +154,7 @@ finalK :: Success a a
 finalK s a = Right (a,s)
 
 failK :: Failure a
-failK ls s = Left (unlines [formatTrace ls, s])
+failK ls s = Left (unlines [s, formatTrace ls])
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
