@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP        #-}
-{-# LANGUAGE MagicHash  #-} {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE MagicHash  #-}
+{-# LANGUAGE Rank2Types #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -110,8 +111,8 @@ type Success a r = B.ByteString -> a      -> Either String (r, B.ByteString)
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
   { unGet :: forall r. B.ByteString
-                    -> Failure   r -- failure
-                    -> Success a r -- success
+                    -> Failure   r
+                    -> Success a r
                     -> Either String (r, B.ByteString) }
 
 instance Functor Get where
@@ -161,6 +162,7 @@ runGet :: Get a -> B.ByteString -> Either String a
 runGet m str = case unGet m str failK finalK of
   Left  i      -> Left i
   Right (a, _) -> Right a
+{-# INLINE runGet #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
 -- ByteString. Additional to the result of get it returns the number of
@@ -171,6 +173,7 @@ runGetState m str off =
     case unGet m (B.drop off str) failK finalK of
       Left i        -> Left i
       Right (a, bs) -> Right (a, bs)
+{-# INLINE runGetState #-}
 
 ------------------------------------------------------------------------
 
@@ -263,7 +266,6 @@ isEmpty = B.null `fmap` get
 -- than @n@ bytes are left in the input.
 getByteString :: Int -> Get B.ByteString
 getByteString  = getBytes
-{-# INLINE getByteString #-}
 
 getRemaining :: Get B.ByteString
 getRemaining  = getBytes =<< remaining
@@ -284,7 +286,7 @@ getBytes n = do
     let (consume,rest) = B.splitAt n s
     put rest
     return consume
-{-# INLINE getBytes #-}
+
 
 ------------------------------------------------------------------------
 -- Primtives

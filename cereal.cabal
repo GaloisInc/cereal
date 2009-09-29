@@ -32,17 +32,18 @@ library
         else
                 build-depends:  base < 3.0
 
-        hs-source-dirs: src
+        hs-source-dirs:         src
 
-        exposed-modules:Data.Serialize,
-                        Data.Serialize.Put,
-                        Data.Serialize.Get,
-                        Data.Serialize.Builder
+        exposed-modules:        Data.Serialize,
+                                Data.Serialize.Put,
+                                Data.Serialize.Get,
+                                Data.Serialize.Builder
 
-        extensions:     CPP,
-                        FlexibleContexts,
-                        FlexibleInstances,
-                        Rank2Types,
-                        MagicHash
+        extensions:             CPP,
+                                FlexibleContexts,
+                                FlexibleInstances,
+                                Rank2Types,
+                                MagicHash
 
-        ghc-options:    -O2 -Wall -fliberate-case-threshold=1000 -funbox-strict-fields
+        ghc-options:            -Wall -funbox-strict-fields
+        ghc-prof-options:       -prof -auto-all
