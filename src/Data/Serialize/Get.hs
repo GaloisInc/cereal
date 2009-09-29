@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP        #-}
-{-# LANGUAGE MagicHash  #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE MagicHash  #-} {-# LANGUAGE Rank2Types #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -105,20 +104,18 @@ import GHC.Base
 import GHC.Word
 #endif
 
-type Trace = [String] -> String
-
-type Failure   r = String            -> Either String (r, B.ByteString)
-type Success a r = B.ByteString -> a -> Either String (r, B.ByteString)
+type Failure   r = [String]     -> String -> Either String (r, B.ByteString)
+type Success a r = B.ByteString -> a      -> Either String (r, B.ByteString)
 
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
-  { unGet :: forall r. Trace -> B.ByteString
+  { unGet :: forall r. B.ByteString
                     -> Failure   r -- failure
                     -> Success a r -- success
                     -> Either String (r, B.ByteString) }
 
 instance Functor Get where
-    fmap p m = Get (\t s0 f k -> unGet m t s0 f (\s a -> k s (p a)))
+    fmap p m = Get (\s0 f k -> unGet m s0 f (\s a -> k s (p a)))
 
 instance Applicative Get where
     pure  = return
@@ -130,38 +127,38 @@ instance Alternative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a = Get (\_ s0 _ k -> k s0 a)
-    m >>= g  = Get (\t s0 f k -> unGet m t s0 f (\s a -> unGet (g a) t s f k))
+    return a = Get (\s0 _ k -> k s0 a)
+    m >>= g  = Get (\s0 f k -> unGet m s0 f (\s a -> unGet (g a) s f k))
     fail     = failDesc
 
 instance MonadPlus Get where
     mzero = failDesc "mzero"
-    mplus a b = Get (\t s0 f k -> unGet a t s0 (\_ -> unGet b t s0 f k) k)
+    mplus a b = Get (\s0 f k -> unGet a s0 (\_ _ -> unGet b s0 f k) k)
 
 ------------------------------------------------------------------------
 
-formatTrace :: Trace
+formatTrace :: [String] -> String
 formatTrace [] = "Empty call stack"
 formatTrace ls = "From:\t" ++ intercalate "\n\t" ls ++ "\n"
 
 get :: Get B.ByteString
-get  = Get (\_ s0 _ k -> k s0 s0)
+get  = Get (\s0 _ k -> k s0 s0)
 
 put :: B.ByteString -> Get ()
-put s = Get (\_ _ _ k -> k s ())
+put s = Get (\_ _ k -> k s ())
 
 label :: String -> Get a -> Get a
-label l m = Get (\t s0 k -> unGet m (\ls -> t (l:ls)) s0 k)
+label l m = Get (\s0 f k -> unGet m s0 (\ls s -> f (l:ls) s) k)
 
 finalK :: Success a a
 finalK s a = Right (a,s)
 
 failK :: Failure a
-failK  = Left
+failK ls s = Left (unlines [formatTrace ls, s])
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
-runGet m str = case unGet m formatTrace str failK finalK of
+runGet m str = case unGet m str failK finalK of
   Left  i      -> Left i
   Right (a, _) -> Right a
 
@@ -171,7 +168,7 @@ runGet m str = case unGet m formatTrace str failK finalK of
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString)
 runGetState m str off =
-    case unGet m formatTrace (B.drop off str) failK finalK of
+    case unGet m (B.drop off str) failK finalK of
       Left i        -> Left i
       Right (a, bs) -> Right (a, bs)
 
@@ -195,7 +192,7 @@ isolate l n m = label l $ do
 failDesc :: String -> Get a
 failDesc err = do
     let msg = "Failed reading" ++ err
-    Get (\t _ f _ -> f (msg ++ "\n" ++ t []))
+    Get (\_ f _ -> f [] msg)
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
@@ -266,6 +263,7 @@ isEmpty = B.null `fmap` get
 -- than @n@ bytes are left in the input.
 getByteString :: Int -> Get B.ByteString
 getByteString  = getBytes
+{-# INLINE getByteString #-}
 
 getRemaining :: Get B.ByteString
 getRemaining  = getBytes =<< remaining
@@ -286,6 +284,7 @@ getBytes n = do
     let (consume,rest) = B.splitAt n s
     put rest
     return consume
+{-# INLINE getBytes #-}
 
 ------------------------------------------------------------------------
 -- Primtives
