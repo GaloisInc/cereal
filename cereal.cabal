@@ -3,7 +3,7 @@ version:                0.1
 license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>, Galois Inc.
-maintainer:             Galois Inc.
+maintainer:             Trevor Elliott <trevor@galois.com>
 category:               Data, Parsing
 stability:              provisional
 build-type:             Simple
@@ -28,7 +28,7 @@ flag split-base
 library
         build-depends:          bytestring
         if flag(split-base)
-                build-depends:  base >= 3.0, containers, array
+                build-depends:  base == 4.*, containers, array
         else
                 build-depends:  base < 3.0
 
