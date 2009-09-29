@@ -9,12 +9,12 @@ stability:              provisional
 build-type:             Simple
 cabal-version:          >= 1.6
 synopsis:               A binary serialization library
-extra-source-files:     Benchmark.hs,
-                        CBenchmark.c,
-                        CBenchmark.h,
-                        Makefile,
-                        MemBench.hs,
-                        Tests.hs
+extra-source-files:     tests/Benchmark.hs,
+                        tests/CBenchmark.c,
+                        tests/CBenchmark.h,
+                        tests/Makefile,
+                        tests/MemBench.hs,
+                        tests/Tests.hs
 description:
   A binary serialization library, similar to binary, that introduces an isolate
   primitive for parser isolation, and replaces the asynchronous errors with a
