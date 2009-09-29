@@ -1,5 +1,15 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
+--------------------------------------------------------------------------------
+-- |
+-- Module      : 
+-- Copyright   : (c) Galois, Inc, 2009
+-- License     : AllRightsReserved
+--
+-- Maintainer  : Trevor Elliott <trevor@galois.com>
+-- Stability   : 
+-- Portability : 
+--
 
 import Data.Serialize
 import Data.Serialize.Get
