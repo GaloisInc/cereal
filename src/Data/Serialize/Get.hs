@@ -30,6 +30,7 @@ module Data.Serialize.Get (
 
     -- * Parsing
     , isolate
+    , label
     , skip
     , uncheckedSkip
     , lookAhead
