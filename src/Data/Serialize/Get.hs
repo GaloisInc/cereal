@@ -48,7 +48,6 @@ module Data.Serialize.Get (
 
     -- ** ByteStrings
     , getByteString
-    , getRemaining
     , getLazyByteString
 
     -- ** Big-endian reads
@@ -182,6 +181,7 @@ runGetState m str off =
 --   is required to consume all the bytes that it is isolated to.
 isolate :: String -> Int -> Get a -> Get a
 isolate l n m = label l $ do
+  when (n < 0) (fail "Attempted to isolate a negative number of bytes")
   s <- get
   let left = B.length s
   unless (n <= left) (fail "not enough space left to isolate")
@@ -264,12 +264,12 @@ isEmpty = B.null `fmap` get
 -- Utility with ByteStrings
 
 -- | An efficient 'get' method for strict ByteStrings. Fails if fewer
--- than @n@ bytes are left in the input.
+-- than @n@ bytes are left in the input. This function creates a fresh
+-- copy of the underlying bytes.
 getByteString :: Int -> Get B.ByteString
-getByteString  = getBytes
-
-getRemaining :: Get B.ByteString
-getRemaining  = getBytes =<< remaining
+getByteString n = do
+  bs <- getBytes n
+  return $! B.copy bs
 
 getLazyByteString :: Int64 -> Get L.ByteString
 getLazyByteString n = f `fmap` getBytes (fromIntegral n)
