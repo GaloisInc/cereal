@@ -195,7 +195,7 @@ isolate l n m = label l $ do
 
 failDesc :: String -> Get a
 failDesc err = do
-    let msg = "Failed reading" ++ err
+    let msg = "Failed reading: " ++ err
     Get (\_ f _ -> f [] msg)
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
