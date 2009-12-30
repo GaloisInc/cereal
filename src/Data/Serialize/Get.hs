@@ -149,7 +149,7 @@ put :: B.ByteString -> Get ()
 put s = Get (\_ _ k -> k s ())
 
 label :: String -> Get a -> Get a
-label l m = Get (\s0 f k -> unGet m s0 (\ls s -> f (l:ls) s) k)
+label l m = Get (\s0 f k -> unGet m s0 (\ls -> f (l:ls)) k)
 
 finalK :: Success a a
 finalK s a = Right (a,s)
@@ -179,8 +179,8 @@ runGetState m str off =
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
-isolate :: String -> Int -> Get a -> Get a
-isolate l n m = label l $ do
+isolate :: Int -> Get a -> Get a
+isolate n m = do
   when (n < 0) (fail "Attempted to isolate a negative number of bytes")
   s <- get
   let left = B.length s
