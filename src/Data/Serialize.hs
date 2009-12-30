@@ -20,20 +20,12 @@ module Data.Serialize (
 
     -- $example
 
-    -- * The Get and Put monads
-    , Get
-    , Put
-    , Putter
-
-    -- * Useful helpers for writing instances
-    , putWord8
-    , getWord8
-
     -- * Serialize serialisation
     , encode
     , decode
 
-    , module Data.Word -- useful
+    , module Data.Serialize.Get
+    , module Data.Serialize.Put
 
     ) where
 
