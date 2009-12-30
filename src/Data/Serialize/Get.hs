@@ -293,13 +293,13 @@ getBytes n = do
 -- Primtives
 
 -- helper, get a raw Ptr onto a strict ByteString copied out of the
--- underlying lazy byteString. So many indirections from the raw parser
--- state that my head hurts...
+-- underlying strict byteString.
 
 getPtr :: Storable a => Int -> Get a
 getPtr n = do
     (fp,o,_) <- B.toForeignPtr `fmap` getBytes n
-    return . B.inlinePerformIO $ withForeignPtr fp $ \p -> peek (castPtr $ p `plusPtr` o)
+    let k p = peek (castPtr (p `plusPtr` o))
+    return (B.inlinePerformIO (withForeignPtr fp k))
 
 ------------------------------------------------------------------------
 
