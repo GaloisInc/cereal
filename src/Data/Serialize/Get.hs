@@ -272,7 +272,7 @@ getByteString n = do
   return $! B.copy bs
 
 getLazyByteString :: Int64 -> Get L.ByteString
-getLazyByteString n = f `fmap` getBytes (fromIntegral n)
+getLazyByteString n = f `fmap` getByteString (fromIntegral n)
   where f bs = L.fromChunks [bs]
 
 
