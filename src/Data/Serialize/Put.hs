@@ -8,7 +8,7 @@
 -- Stability   :
 -- Portability :
 --
--- The Put monad. A monad for efficiently constructing lazy bytestrings.
+-- The Put monad. A monad for efficiently constructing bytestrings.
 --
 -----------------------------------------------------------------------------
 
