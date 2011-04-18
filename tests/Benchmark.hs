@@ -7,6 +7,7 @@ import Data.Serialize.Put
 import Data.Serialize.Get
 
 import Control.Exception
+import Data.Word
 import System.CPUTime
 import Numeric
 import Text.Printf
