@@ -1,8 +1,10 @@
 name:                   cereal
-version:                0.3.0.0
+version:                0.3.1.0
 license:                BSD3
 license-file:           LICENSE
-author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>, Galois Inc.
+author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
+                        Galois Inc.,
+                        Lemmih <lemmih@gmail.com>
 maintainer:             Trevor Elliott <trevor@galois.com>
 category:               Data, Parsing
 stability:              provisional
