@@ -20,6 +20,8 @@ module Data.Serialize.Put (
     , Putter
     , runPut
     , runPutM
+    , runPutLazy
+    , runPutMLazy
     , putBuilder
     , execPut
 
@@ -62,7 +64,7 @@ module Data.Serialize.Put (
 
   ) where
 
-import Data.Serialize.Builder (Builder, toByteString)
+import Data.Serialize.Builder (Builder, toByteString, toLazyByteString)
 import qualified Data.Serialize.Builder as B
 
 import Control.Applicative
@@ -150,6 +152,16 @@ runPut = toByteString . sndS . unPut
 runPutM :: PutM a -> (a, S.ByteString)
 runPutM (Put (PairS f s)) = (f, toByteString s)
 {-# INLINE runPutM #-}
+
+-- | Run the 'Put' monad with a serialiser
+runPutLazy :: Put -> L.ByteString
+runPutLazy = toLazyByteString . sndS . unPut
+{-# INLINE runPut #-}
+
+-- | Run the 'Put' monad with a serialiser
+runPutMLazy :: Put -> (a, L.ByteString)
+runPutMLazy (Put (PairS f s)) = (f, toLazyByteString s)
+{-# INLINE runPut #-}
 
 ------------------------------------------------------------------------
 

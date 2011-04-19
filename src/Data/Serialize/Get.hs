@@ -26,7 +26,9 @@ module Data.Serialize.Get (
     -- * The Get type
       Get
     , runGet
+    , runGetLazy
     , runGetState
+    , runGetLazyState
     , Result(..)
     , runGetPartial
 
@@ -198,6 +200,17 @@ runGet m str = case unGet m str Complete failK finalK of
   Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
 
+-- | Run the Get monad over a Lazy ByteString.
+runGetLazy :: Get a -> L.ByteString -> Either String a
+runGetLazy m lstr = loop (runGetPartial m) (L.toChunks lstr)
+  where
+  loop k []     = Left "Failed reading: Internal error: unexpected end of input"
+  loop k (c:cs) = case k c of
+    Fail str   -> Left str
+    Partial k' -> loop k' cs
+    Done r _   -> Right r
+{-# INLINE runGetLazy #-}
+
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGetPartial :: Get a -> B.ByteString -> Result a
 runGetPartial m str = unGet m str Incomplete failK finalK
@@ -214,6 +227,17 @@ runGetState m str off =
       Done a bs   -> Right (a, bs)
       Partial{}   -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGetState #-}
+
+-- | Run the Get monad over a Lazy ByteString.
+runGetLazyState :: Get a -> L.ByteString -> Either String (a,L.ByteString)
+runGetLazyState m lstr = loop (runGetPartial m) (L.toChunks lstr)
+  where
+  loop k []     = Left "Failed reading: Internal error: unexpected end of input"
+  loop k (c:cs) = case k c of
+    Fail str   -> Left str
+    Partial k' -> loop k' cs
+    Done r c'  -> Right (r,L.fromChunks (c':cs))
+{-# INLINE runGetLazyState #-}
 
 ------------------------------------------------------------------------
 
