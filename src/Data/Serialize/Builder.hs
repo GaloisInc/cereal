@@ -58,10 +58,9 @@ module Data.Serialize.Builder (
 
 import Data.Monoid
 import Foreign
-import qualified Data.ByteString               as S
-import qualified Data.ByteString.Lazy          as L
-import qualified Data.ByteString.Internal      as S
-import qualified Data.ByteString.Lazy.Internal as L
+import qualified Data.ByteString          as S
+import qualified Data.ByteString.Lazy     as L
+import qualified Data.ByteString.Internal as S
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base

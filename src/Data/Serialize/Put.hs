@@ -69,7 +69,6 @@ import qualified Data.Serialize.Builder as B
 
 import Control.Applicative
 import Data.Array.Unboxed
-import Data.Ix
 import Data.Monoid
 import Data.Word
 import qualified Data.ByteString        as S
@@ -156,12 +155,12 @@ runPutM (Put (PairS f s)) = (f, toByteString s)
 -- | Run the 'Put' monad with a serialiser
 runPutLazy :: Put -> L.ByteString
 runPutLazy = toLazyByteString . sndS . unPut
-{-# INLINE runPut #-}
+{-# INLINE runPutLazy #-}
 
 -- | Run the 'Put' monad with a serialiser
-runPutMLazy :: Put -> (a, L.ByteString)
+runPutMLazy :: PutM a -> (a, L.ByteString)
 runPutMLazy (Put (PairS f s)) = (f, toLazyByteString s)
-{-# INLINE runPut #-}
+{-# INLINE runPutMLazy #-}
 
 ------------------------------------------------------------------------
 

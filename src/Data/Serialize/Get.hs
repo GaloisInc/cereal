@@ -204,7 +204,7 @@ runGet m str = case unGet m str Complete failK finalK of
 runGetLazy :: Get a -> L.ByteString -> Either String a
 runGetLazy m lstr = loop (runGetPartial m) (L.toChunks lstr)
   where
-  loop k []     = Left "Failed reading: Internal error: unexpected end of input"
+  loop _ []     = Left "Failed reading: Internal error: unexpected end of input"
   loop k (c:cs) = case k c of
     Fail str   -> Left str
     Partial k' -> loop k' cs
@@ -232,7 +232,7 @@ runGetState m str off =
 runGetLazyState :: Get a -> L.ByteString -> Either String (a,L.ByteString)
 runGetLazyState m lstr = loop (runGetPartial m) (L.toChunks lstr)
   where
-  loop k []     = Left "Failed reading: Internal error: unexpected end of input"
+  loop _ []     = Left "Failed reading: Internal error: unexpected end of input"
   loop k (c:cs) = case k c of
     Fail str   -> Left str
     Partial k' -> loop k' cs
