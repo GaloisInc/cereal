@@ -27,8 +27,11 @@ module Data.Serialize.Get (
       Get
     , runGet
     , runGetState
+    , Result(..)
+    , runGetPartial
 
     -- * Parsing
+    , ensure
     , isolate
     , label
     , skip
@@ -105,18 +108,47 @@ import GHC.Base
 import GHC.Word
 #endif
 
-type Failure   r = [String]     -> String -> Either String (r, B.ByteString)
-type Success a r = B.ByteString -> a      -> Either String (r, B.ByteString)
+type Failure   r = [String]     -> String -> Result r
+type Success a r = B.ByteString -> More -> a      -> Result r
+
+-- | The result of a parse.
+data Result r = Fail String
+              -- ^ The parse failed. The 'String' is the
+              --   message describing the error, if any.
+              | Partial (B.ByteString -> Result r)
+              -- ^ Supply this continuation with more input so that
+              --   the parser can resume. To indicate that no more
+              --   input is available, use an 'B.empty' string.
+              | Done r B.ByteString
+              -- ^ The parse succeeded.  The 'B.ByteString' is the
+              --   input that had not yet been consumed (if any) when
+              --   the parse succeeded.
+
+instance Show r => Show (Result r) where
+    show (Fail msg)  = "Fail " ++ show msg
+    show (Partial _) = "Partial _"
+    show (Done r bs) = "Done " ++ show r ++ " " ++ show bs
+
+instance Functor Result where
+    fmap _ (Fail msg)  = Fail msg
+    fmap f (Partial k) = Partial (fmap f . k)
+    fmap f (Done r bs) = Done (f r) bs
 
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
   { unGet :: forall r. B.ByteString
+                    -> More
                     -> Failure   r
                     -> Success a r
-                    -> Either String (r, B.ByteString) }
+                   -- -> Either String (r, B.ByteString) }
+                    -> Result r }
+
+-- | Have we read all available input?
+data More = Complete | Incomplete
+    deriving (Eq)
 
 instance Functor Get where
-    fmap p m = Get (\s0 f k -> unGet m s0 f (\s a -> k s (p a)))
+    fmap p m = Get (\s0 m0 f k -> unGet m s0 m0 f (\s m1 a -> k s m1 (p a)))
 
 instance Applicative Get where
     pure  = return
@@ -128,13 +160,13 @@ instance Alternative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a = Get (\s0 _ k -> k s0 a)
-    m >>= g  = Get (\s0 f k -> unGet m s0 f (\s a -> unGet (g a) s f k))
+    return a = Get (\s0 m _ k -> k s0 m a)
+    m >>= g  = Get (\s0 m0 f k -> unGet m s0 m0 f (\s m1 a -> unGet (g a) s m1 f k))
     fail     = failDesc
 
 instance MonadPlus Get where
     mzero = failDesc "mzero"
-    mplus a b = Get (\s0 f k -> unGet a s0 (\_ _ -> unGet b s0 f k) k)
+    mplus a b = Get (\s0 m0 f k -> unGet a s0 m0 (\_ _ -> unGet b s0 m0 f k) k)
 
 ------------------------------------------------------------------------
 
@@ -143,26 +175,32 @@ formatTrace [] = "Empty call stack"
 formatTrace ls = "From:\t" ++ intercalate "\n\t" ls ++ "\n"
 
 get :: Get B.ByteString
-get  = Get (\s0 _ k -> k s0 s0)
+get  = Get (\s0 m0 _ k -> k s0 m0 s0)
 
 put :: B.ByteString -> Get ()
-put s = Get (\_ _ k -> k s ())
+put s = Get (\_ m _ k -> k s m ())
 
 label :: String -> Get a -> Get a
-label l m = Get (\s0 f k -> unGet m s0 (\ls -> f (l:ls)) k)
+label l m = Get (\s0 m0 f k -> unGet m s0 m0 (\ls -> f (l:ls)) k)
 
 finalK :: Success a a
-finalK s a = Right (a,s)
+finalK s _ a = Done a s
 
 failK :: Failure a
-failK ls s = Left (unlines [s, formatTrace ls])
+failK ls s = Fail (unlines [s, formatTrace ls])
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
-runGet m str = case unGet m str failK finalK of
-  Left  i      -> Left i
-  Right (a, _) -> Right a
+runGet m str = case unGet m str Complete failK finalK of
+  Fail i    -> Left i
+  Done a _  -> Right a
+  Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
+
+-- | Run the Get monad applies a 'get'-based parser on the input ByteString
+runGetPartial :: Get a -> B.ByteString -> Result a
+runGetPartial m str = unGet m str Incomplete failK finalK
+{-# INLINE runGetPartial #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
 -- ByteString. Additional to the result of get it returns the number of
@@ -170,21 +208,28 @@ runGet m str = case unGet m str failK finalK of
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString)
 runGetState m str off =
-    case unGet m (B.drop off str) failK finalK of
-      Left i        -> Left i
-      Right (a, bs) -> Right (a, bs)
+    case unGet m (B.drop off str) Complete failK finalK of
+      Fail i      -> Left i
+      Done a bs   -> Right (a, bs)
+      Partial{}   -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGetState #-}
 
 ------------------------------------------------------------------------
+
+-- | If at least @n@ bytes of input are available, return the current
+--   input, otherwise fail.
+ensure :: Int -> Get B.ByteString
+ensure n = Get $ \i0 m0 kf ks ->
+    if B.length i0 >= n
+    then ks i0 m0 i0
+    else unGet (demandInput >> ensure n) i0 m0 kf ks
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
 isolate :: Int -> Get a -> Get a
 isolate n m = do
   when (n < 0) (fail "Attempted to isolate a negative number of bytes")
-  s <- get
-  let left = B.length s
-  unless (n <= left) (fail "not enough space left to isolate")
+  s <- ensure n
   let (s',rest) = B.splitAt n s
   put s'
   a    <- m
@@ -193,16 +238,27 @@ isolate n m = do
   put rest
   return a
 
+-- | Immediately demand more input via a 'Partial' continuation
+--   result.
+demandInput :: Get ()
+demandInput = Get $ \i0 m0 kf ks ->
+    if m0 == Complete
+    then kf ["demandInput"] "too few bytes"
+    else Partial $ \s ->
+         if B.null s
+         then kf ["demandInput"] "too few bytes"
+         else ks (i0 `B.append` s) Incomplete ()
+
+
 failDesc :: String -> Get a
 failDesc err = do
     let msg = "Failed reading: " ++ err
-    Get (\_ f _ -> f [] msg)
+    Get (\_ _ f _ -> f [] msg)
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
 skip n = do
-  s <- get
-  when (B.length s < n) (fail "too few bytes")
+  s <- ensure n
   put (B.drop n s)
 
 -- | Skip ahead @n@ bytes. No error if there isn't enough bytes.
@@ -282,8 +338,7 @@ getLazyByteString n = f `fmap` getByteString (fromIntegral n)
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
 getBytes n = do
-    s <- get
-    when (n > B.length s) (fail "too few bytes")
+    s <- ensure n
     let (consume,rest) = B.splitAt n s
     put rest
     return consume
