@@ -94,6 +94,7 @@ import Foreign
 
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Internal as B
+import qualified Data.ByteString.Unsafe   as B
 import qualified Data.ByteString.Lazy     as L
 import qualified Data.IntMap              as IntMap
 import qualified Data.IntSet              as IntSet
@@ -219,10 +220,19 @@ runGetState m str off =
 -- | If at least @n@ bytes of input are available, return the current
 --   input, otherwise fail.
 ensure :: Int -> Get B.ByteString
-ensure n = Get $ \i0 m0 kf ks ->
+ensure n = n `seq` Get $ \i0 m0 kf ks ->
     if B.length i0 >= n
     then ks i0 m0 i0
-    else unGet (demandInput >> ensure n) i0 m0 kf ks
+    else unGet (demandInput >> ensureRec n) i0 m0 kf ks
+{-# INLINE ensure #-}
+
+-- | If at least @n@ bytes of input are available, return the current
+--   input, otherwise fail.
+ensureRec :: Int -> Get B.ByteString
+ensureRec n = Get $ \i0 m0 kf ks ->
+    if B.length i0 >= n
+    then ks i0 m0 i0
+    else unGet (demandInput >> ensureRec n) i0 m0 kf ks
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
@@ -248,7 +258,6 @@ demandInput = Get $ \i0 m0 kf ks ->
          if B.null s
          then kf ["demandInput"] "too few bytes"
          else ks (i0 `B.append` s) Incomplete ()
-
 
 failDesc :: String -> Get a
 failDesc err = do
@@ -339,7 +348,9 @@ getLazyByteString n = f `fmap` getByteString (fromIntegral n)
 getBytes :: Int -> Get B.ByteString
 getBytes n = do
     s <- ensure n
-    let (consume,rest) = B.splitAt n s
+    let consume = B.unsafeTake n s
+        rest    = B.unsafeDrop n s
+        -- (consume,rest) = B.splitAt n s
     put rest
     return consume
 
