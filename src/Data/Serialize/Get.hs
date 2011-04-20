@@ -200,7 +200,8 @@ runGet m str = case unGet m str Complete failK finalK of
   Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
 
--- | Run the Get monad over a Lazy ByteString.
+-- | Run the Get monad over a Lazy ByteString.  Note that this will not run the
+-- Get parser lazily, but will operate on lazy ByteStrings.
 runGetLazy :: Get a -> L.ByteString -> Either String a
 runGetLazy m lstr = loop (runGetPartial m) (L.toChunks lstr)
   where
@@ -228,7 +229,8 @@ runGetState m str off =
       Partial{}   -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGetState #-}
 
--- | Run the Get monad over a Lazy ByteString.
+-- | Run the Get monad over a Lazy ByteString.  Note that this does not run the
+-- Get parser lazily, but will operate on lazy ByteStrings.
 runGetLazyState :: Get a -> L.ByteString -> Either String (a,L.ByteString)
 runGetLazyState m lstr = loop (runGetPartial m) (L.toChunks lstr)
   where
