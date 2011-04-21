@@ -62,16 +62,23 @@ class Serialize t where
 ------------------------------------------------------------------------
 -- Wrappers to run the underlying monad
 
--- | Encode a value using binary serialisation to a strict ByteString.
---
+-- | Encode a value using binary serialization to a strict ByteString.
 encode :: Serialize a => a -> ByteString
 encode = runPut . put
 
+-- | Encode a value using binary serialization to a lazy ByteString.
+encodeLazy :: Serialize a => a -> L.ByteString
+encodeLazy  = runPutLazy . put
+
 -- | Decode a value from a strict ByteString, reconstructing the original
 -- structure.
---
 decode :: Serialize a => ByteString -> Either String a
 decode = runGet get
+
+-- | Decode a value from a lazy ByteString, reconstructing the original
+-- structure.
+decodeLazy :: Serialize a => L.ByteString -> Either String a
+decodeLazy  = runGetLazy get
 
 ------------------------------------------------------------------------
 -- Simple instances
