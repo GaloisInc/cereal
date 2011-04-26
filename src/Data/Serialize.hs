@@ -21,8 +21,8 @@ module Data.Serialize (
     -- $example
 
     -- * Serialize serialisation
-    , encode
-    , decode
+    , encode, encodeLazy
+    , decode, decodeLazy
 
     , module Data.Serialize.Get
     , module Data.Serialize.Put
