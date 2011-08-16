@@ -1,5 +1,5 @@
 name:                   cereal
-version:                0.3.3.0
+version:                0.3.4.0
 license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
@@ -39,7 +39,8 @@ library
         exposed-modules:        Data.Serialize,
                                 Data.Serialize.Put,
                                 Data.Serialize.Get,
-                                Data.Serialize.Builder
+                                Data.Serialize.Builder,
+                                Data.Serialize.IEEE754
 
         extensions:             CPP,
                                 FlexibleContexts,

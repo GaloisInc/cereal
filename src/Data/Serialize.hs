@@ -26,11 +26,13 @@ module Data.Serialize (
 
     , module Data.Serialize.Get
     , module Data.Serialize.Put
+    , module Data.Serialize.IEEE754
 
     ) where
 
 import Data.Serialize.Put
 import Data.Serialize.Get
+import Data.Serialize.IEEE754
 
 import Control.Monad
 import Data.Array.Unboxed

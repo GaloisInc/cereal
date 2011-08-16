@@ -14,6 +14,7 @@
 import Data.Serialize
 import Data.Serialize.Get
 import Data.Serialize.Put
+import Data.Serialize.IEEE754
 import Data.Word (Word8,Word16,Word32,Word64)
 import Test.QuickCheck as QC
 
@@ -34,6 +35,10 @@ main  = mapM_ quickCheck
   , QC.label "Word16host    Round Trip" $ roundTrip putWord16host getWord16host
   , QC.label "Word32host    Round Trip" $ roundTrip putWord32host getWord32host
   , QC.label "Word64host    Round Trip" $ roundTrip putWord64host getWord64host
+  , QC.label "Float32le     Round Trip" $ roundTrip putFloat32le  getFloat32le
+  , QC.label "Float32be     Round Trip" $ roundTrip putFloat32be  getFloat32be
+  , QC.label "Float64le     Round Trip" $ roundTrip putFloat64le  getFloat64le
+  , QC.label "Float64be     Round Trip" $ roundTrip putFloat64be  getFloat64be
 
     -- Containers
   , QC.label "(Word8,Word8) Round Trip"
