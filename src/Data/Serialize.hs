@@ -1,5 +1,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE CPP #-}
+
+#ifdef GENERICS
+{-# LANGUAGE DefaultSignatures
+           , TypeOperators
+           , BangPatterns
+           , KindSignatures
+           , ScopedTypeVariables
+  #-}
+#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,7 +37,6 @@ module Data.Serialize (
     , module Data.Serialize.Get
     , module Data.Serialize.Put
     , module Data.Serialize.IEEE754
-
     ) where
 
 import Data.Serialize.Put
@@ -53,13 +62,34 @@ import qualified Data.Ratio           as R
 import qualified Data.Tree            as T
 import qualified Data.Sequence        as Seq
 
+#ifdef GENERICS
+import GHC.Generics
+import Control.Applicative ((*>),(<*>),(<$>),pure)
+#endif
+
 ------------------------------------------------------------------------
 
+
+-- | If your compiler has support for the @DeriveGeneric@ and
+-- @DefaultSignatures@ language extensions (@ghc >= 7.2.1@), the 'put' and 'get'
+-- methods will have default generic implementations.
+--
+-- To use this option, simply add a @deriving 'Generic'@ clause to your datatype
+-- and declare a 'Serialize' instance for it without giving a definition for
+-- 'put' and 'get'.
 class Serialize t where
     -- | Encode a value in the Put monad.
     put :: Putter t
     -- | Decode a value in the Get monad
     get :: Get t
+
+#ifdef GENERICS
+    default put :: (Generic t, GSerialize (Rep t)) => Putter t
+    put = gPut . from
+
+    default get :: (Generic t, GSerialize (Rep t)) => Get t
+    get = to <$> gGet
+#endif
 
 ------------------------------------------------------------------------
 -- Wrappers to run the underlying monad
@@ -402,3 +432,119 @@ instance (Serialize i, Ix i, Serialize e, IArray UArray e)
   => Serialize (UArray i e) where
     put = putIArrayOf put put
     get = getIArrayOf get get
+
+#ifdef GENERICS
+------------------------------------------------------------------------
+-- Generic Serialze
+
+class GSerialize f where
+    gPut :: Putter (f a)
+    gGet :: Get (f a)
+
+instance GSerialize a => GSerialize (M1 i c a) where
+    gPut = gPut . unM1
+    gGet = M1 <$> gGet
+    {-# INLINE gPut #-}
+    {-# INLINE gGet #-}
+
+instance Serialize a => GSerialize (K1 i a) where
+    gPut = put . unK1
+    gGet = K1 <$> get
+    {-# INLINE gPut #-}
+    {-# INLINE gGet #-}
+
+instance GSerialize U1 where
+    gPut _ = pure ()
+    gGet   = pure U1
+    {-# INLINE gPut #-}
+    {-# INLINE gGet #-}
+
+instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
+    gPut (a :*: b) = gPut a *> gPut b
+    gGet = (:*:) <$> gGet  <*> gGet
+    {-# INLINE gPut #-}
+    {-# INLINE gGet #-}
+
+-- The following GSerialize instance for sums has support for serializing types
+-- with up to 2^64-1 constructors. It will use the minimal number of bytes
+-- needed to encode the constructor. For example when a type has 2^8
+-- constructors or less it will use a single byte to encode the constructor. If
+-- it has 2^16 constructors or less it will use two bytes, and so on till 2^64-1.
+
+#define GUARD(WORD) (size - 1) <= fromIntegral (maxBound :: WORD)
+#define PUTSUM(WORD) GUARD(WORD) = putSum (0 :: WORD) (fromIntegral size)
+#define GETSUM(WORD) GUARD(WORD) = (get :: Get WORD) >>= checkGetSum (fromIntegral size)
+
+instance ( PutSum     a, PutSum     b
+         , GetSum     a, GetSum     b
+         , GSerialize a, GSerialize b
+         , SumSize    a, SumSize    b) => GSerialize (a :+: b) where
+    gPut | PUTSUM(Word8) | PUTSUM(Word16) | PUTSUM(Word32) | PUTSUM(Word64)
+         | otherwise = sizeError "encode" size
+      where
+        size = unTagged (sumSize :: Tagged (a :+: b) Word64)
+
+    gGet | GETSUM(Word8) | GETSUM(Word16) | GETSUM(Word32) | GETSUM(Word64)
+         | otherwise = sizeError "decode" size
+      where
+        size = unTagged (sumSize :: Tagged (a :+: b) Word64)
+    {-# INLINE gPut #-}
+    {-# INLINE gGet #-}
+
+sizeError :: Show size => String -> size -> error
+sizeError s size = error $ "Can't " ++ s ++ " a type with " ++ show size ++ " constructors"
+
+------------------------------------------------------------------------
+
+class PutSum f where
+    putSum :: (Num word, Bits word, Serialize word) => word -> word -> Putter (f a)
+
+instance (PutSum a, PutSum b, GSerialize a, GSerialize b) => PutSum (a :+: b) where
+    putSum !code !size s = case s of
+                             L1 x -> putSum code           sizeL x
+                             R1 x -> putSum (code + sizeL) sizeR x
+        where
+          sizeL = size `shiftR` 1
+          sizeR = size - sizeL
+    {-# INLINE putSum #-}
+
+instance GSerialize a => PutSum (C1 c a) where
+    putSum !code _ x = put code *> gPut x
+    {-# INLINE putSum #-}
+
+------------------------------------------------------------------------
+
+checkGetSum :: (Ord word, Bits word, GetSum f) => word -> word -> Get (f a)
+checkGetSum size code | code < size = getSum code size
+                      | otherwise   = fail "Unknown encoding for constructor"
+{-# INLINE checkGetSum #-}
+
+class GetSum f where
+    getSum :: (Ord word, Num word, Bits word) => word -> word -> Get (f a)
+
+instance (GetSum a, GetSum b, GSerialize a, GSerialize b) => GetSum (a :+: b) where
+    getSum !code !size | code < sizeL = L1 <$> getSum code           sizeL
+                       | otherwise    = R1 <$> getSum (code - sizeL) sizeR
+        where
+          sizeL = size `shiftR` 1
+          sizeR = size - sizeL
+    {-# INLINE getSum #-}
+
+instance GSerialize a => GetSum (C1 c a) where
+    getSum _ _ = gGet
+    {-# INLINE getSum #-}
+
+------------------------------------------------------------------------
+
+class SumSize f where
+    sumSize :: Tagged f Word64
+
+newtype Tagged (s :: * -> *) b = Tagged {unTagged :: b}
+
+instance (SumSize a, SumSize b) => SumSize (a :+: b) where
+    sumSize = Tagged $ unTagged (sumSize :: Tagged a Word64) +
+                       unTagged (sumSize :: Tagged b Word64)
+
+instance SumSize (C1 c a) where
+    sumSize = Tagged 1
+#endif
