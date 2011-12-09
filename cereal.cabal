@@ -24,6 +24,10 @@ description:
   strict ByteString instead of a lazy ByteString, thus restricting it to
   operating on finite inputs.
 
+source-repository head
+  type:     git
+  location: git://code.galois.com/cereal.git
+
 flag split-base
         default: True
 
