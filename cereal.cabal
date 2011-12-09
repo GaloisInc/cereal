@@ -4,7 +4,8 @@ license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
                         Galois Inc.,
-                        Lemmih <lemmih@gmail.com>
+                        Lemmih <lemmih@gmail.com>,
+                        Bas van Dijk <v.dijk.bas@gmail.com>
 maintainer:             Trevor Elliott <trevor@galois.com>
 category:               Data, Parsing
 stability:              provisional
