@@ -91,7 +91,7 @@ import Control.Monad (unless,when,ap,MonadPlus(..),liftM2)
 import Data.Array.IArray (IArray,listArray)
 import Data.Ix (Ix)
 import Data.List (intercalate)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing,fromMaybe)
 import Foreign
 
 import qualified Data.ByteString          as B
@@ -147,8 +147,15 @@ newtype Get a = Get
                     -> Result r }
 
 -- | Have we read all available input?
-data More = Complete | Incomplete
+data More
+  = Complete
+  | Incomplete (Maybe Int)
     deriving (Eq)
+
+moreLength :: More -> Int
+moreLength m = case m of
+  Complete      -> 0
+  Incomplete mb -> fromMaybe 0 mb
 
 instance Functor Get where
     fmap p m = Get (\s0 m0 f k -> unGet m s0 m0 f (\s m1 a -> k s m1 (p a)))
@@ -200,21 +207,9 @@ runGet m str = case unGet m str Complete failK finalK of
   Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
 
--- | Run the Get monad over a Lazy ByteString.  Note that this will not run the
--- Get parser lazily, but will operate on lazy ByteStrings.
-runGetLazy :: Get a -> L.ByteString -> Either String a
-runGetLazy m lstr = loop (runGetPartial m) (L.toChunks lstr)
-  where
-  loop _ []     = Left "Failed reading: Internal error: unexpected end of input"
-  loop k (c:cs) = case k c of
-    Fail str   -> Left str
-    Partial k' -> loop k' cs
-    Done r _   -> Right r
-{-# INLINE runGetLazy #-}
-
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGetPartial :: Get a -> B.ByteString -> Result a
-runGetPartial m str = unGet m str Incomplete failK finalK
+runGetPartial m str = unGet m str (Incomplete Nothing) failK finalK
 {-# INLINE runGetPartial #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
@@ -229,16 +224,35 @@ runGetState m str off =
       Partial{}   -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGetState #-}
 
+
+-- Lazy Get --------------------------------------------------------------------
+
+runGetLazy' :: Get a -> L.ByteString -> (Either String a,L.ByteString)
+runGetLazy' m lstr = loop run (L.toChunks lstr)
+  where
+  remLen c = fromIntegral (L.length lstr) - B.length c
+  run str  = unGet m str (Incomplete (Just (remLen str))) failK finalK
+
+  loop _ []     =
+    (Left "Failed reading: Internal error: unexpected end of input",L.empty)
+  loop k (c:cs) = case k c of
+    Fail str   -> (Left str,L.empty)
+    Partial k' -> loop k' cs
+    Done r c'  -> (Right r,L.fromChunks (c':cs))
+{-# INLINE runGetLazy' #-}
+
+-- | Run the Get monad over a Lazy ByteString.  Note that this will not run the
+-- Get parser lazily, but will operate on lazy ByteStrings.
+runGetLazy :: Get a -> L.ByteString -> Either String a
+runGetLazy m lstr = fst (runGetLazy' m lstr)
+{-# INLINE runGetLazy #-}
+
 -- | Run the Get monad over a Lazy ByteString.  Note that this does not run the
 -- Get parser lazily, but will operate on lazy ByteStrings.
 runGetLazyState :: Get a -> L.ByteString -> Either String (a,L.ByteString)
-runGetLazyState m lstr = loop (runGetPartial m) (L.toChunks lstr)
-  where
-  loop _ []     = Left "Failed reading: Internal error: unexpected end of input"
-  loop k (c:cs) = case k c of
-    Fail str   -> Left str
-    Partial k' -> loop k' cs
-    Done r c'  -> Right (r,L.fromChunks (c':cs))
+runGetLazyState m lstr = case runGetLazy' m lstr of
+  (Right a,rest) -> Right (a,rest)
+  (Left err,_)   -> Left err
 {-# INLINE runGetLazyState #-}
 
 ------------------------------------------------------------------------
@@ -278,12 +292,13 @@ isolate n m = do
 --   result.
 demandInput :: Get ()
 demandInput = Get $ \i0 m0 kf ks ->
-    if m0 == Complete
-    then kf ["demandInput"] "too few bytes"
-    else Partial $ \s ->
-         if B.null s
-         then kf ["demandInput"] "too few bytes"
-         else ks (i0 `B.append` s) Incomplete ()
+  case m0 of
+    Complete      -> kf ["demandInput"] "too few bytes"
+    Incomplete mb -> Partial $ \s ->
+      if B.null s
+      then kf ["demandInput"] "too few bytes"
+      else let update l = l - B.length s
+            in ks (i0 `B.append` s) (Incomplete (update `fmap` mb)) ()
 
 failDesc :: String -> Get a
 failDesc err = do
@@ -340,16 +355,20 @@ uncheckedLookAhead n = do
 ------------------------------------------------------------------------
 -- Utility
 
--- | Get the number of remaining unparsed bytes.
--- Useful for checking whether all input has been consumed.
--- Note that this forces the rest of the input.
+-- | Get the number of remaining unparsed bytes.  Useful for checking whether
+-- all input has been consumed.
+--
+-- WARNING: when run with @runGetPartial@, remaining will only return the number
+-- of bytes that are remaining in the current input.
 remaining :: Get Int
-remaining = B.length `fmap` get
+remaining = Get (\ s m _ ks -> ks s m (B.length s + moreLength m))
 
--- | Test whether all input has been consumed,
--- i.e. there are no remaining unparsed bytes.
+-- | Test whether all input has been consumed.
+--
+-- WARNING: when run with @runGetPartial@, isEmpty will only tell you if you're
+-- at the end of the current chunk.
 isEmpty :: Get Bool
-isEmpty = B.null `fmap` get
+isEmpty = Get (\ s m _ ks -> ks s m (B.null s && moreLength m == 0))
 
 ------------------------------------------------------------------------
 -- Utility with ByteStrings
