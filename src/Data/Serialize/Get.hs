@@ -339,11 +339,9 @@ uncheckedSkip n = do
 -- | Run @ga@, but return without consuming its input.
 -- Fails if @ga@ fails.
 lookAhead :: Get a -> Get a
-lookAhead ga = do
-    s <- get
-    a <- ga
-    put s
-    return a
+lookAhead ga = Get $ \ s0 b0 m0 kf ks ->
+  let ks' s1 b1 = ks (s0 `B.append` b1) b1
+   in unGet ga s0 B.empty m0 kf ks'
 
 -- | Like 'lookAhead', but consume the input if @gma@ returns 'Just _'.
 -- Fails if @gma@ fails.
