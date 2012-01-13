@@ -141,7 +141,13 @@ newtype Get a = Get
                     -> Result r }
 
 type Input  = B.ByteString
-type Buffer = B.ByteString
+type Buffer = Maybe B.ByteString
+
+append :: Buffer -> Buffer -> Buffer
+append l r = B.append `fmap` l <*> r
+
+bufferBytes :: Buffer -> B.ByteString
+bufferBytes  = fromMaybe B.empty
 
 type Failure   r = Input -> Buffer -> More -> [String] -> String -> Result r
 type Success a r = Input -> Buffer -> More -> a                  -> Result r
@@ -186,9 +192,9 @@ instance MonadPlus Get where
     mzero     = failDesc "mzero"
     mplus a b =
       Get $ \s0 b0 m0 kf ks ->
-        let kf' _ b1 m1 _ _ = unGet b (s0 `B.append` b1)
-                                      (b0 `B.append` b1) m1 kf ks
-         in unGet a s0 B.empty m0 kf' ks
+        let kf' _ b1 m1 _ _ = unGet b (s0 `B.append` bufferBytes b1)
+                                      (b0 `append` b1) m1 kf ks
+         in unGet a s0 (Just B.empty) m0 kf' ks
 
 ------------------------------------------------------------------------
 
@@ -209,7 +215,7 @@ label l m =
      in unGet m s0 b0 m0 kf' ks
 
 finalK :: Success a a
-finalK s b _ a = Done a s
+finalK s _ _ a = Done a s
 
 failK :: Failure a
 failK _ _ _ ls s = Fail (unlines [s, formatTrace ls])
@@ -217,7 +223,7 @@ failK _ _ _ ls s = Fail (unlines [s, formatTrace ls])
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
 runGet m str =
-  case unGet m str B.empty Complete failK finalK of
+  case unGet m str Nothing Complete failK finalK of
     Fail i    -> Left i
     Done a _  -> Right a
     Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
@@ -226,7 +232,7 @@ runGet m str =
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGetPartial :: Get a -> B.ByteString -> Result a
 runGetPartial m str =
-  unGet m str B.empty (Incomplete Nothing) failK finalK
+  unGet m str Nothing (Incomplete Nothing) failK finalK
 {-# INLINE runGetPartial #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
@@ -235,7 +241,7 @@ runGetPartial m str =
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString)
 runGetState m str off =
-    case unGet m (B.drop off str) B.empty Complete failK finalK of
+    case unGet m (B.drop off str) Nothing Complete failK finalK of
       Fail i      -> Left i
       Done a bs   -> Right (a, bs)
       Partial{}   -> Left "Failed reading: Internal error: unexpected Partial."
@@ -248,7 +254,7 @@ runGetLazy' :: Get a -> L.ByteString -> (Either String a,L.ByteString)
 runGetLazy' m lstr = loop run (L.toChunks lstr)
   where
   remLen c = fromIntegral (L.length lstr) - B.length c
-  run str  = unGet m str B.empty (Incomplete (Just (remLen str))) failK finalK
+  run str  = unGet m str Nothing (Incomplete (Just (remLen str))) failK finalK
 
   loop _ []     =
     (Left "Failed reading: Internal error: unexpected end of input",L.empty)
@@ -316,7 +322,7 @@ demandInput = Get $ \s0 b0 m0 kf ks ->
       then kf s0 b0 m0 ["demandInput"] "too few bytes"
       else let update l = l - B.length s
                s1 = s0 `B.append` s
-               b1 = b0 `B.append` s
+               b1 = b0 `append` Just s
             in ks s1 b1 (Incomplete (update `fmap` mb)) ()
 
 failDesc :: String -> Get a
@@ -340,8 +346,8 @@ uncheckedSkip n = do
 -- Fails if @ga@ fails.
 lookAhead :: Get a -> Get a
 lookAhead ga = Get $ \ s0 b0 m0 kf ks ->
-  let ks' s1 b1 = ks (s0 `B.append` b1) b1
-   in unGet ga s0 B.empty m0 kf ks'
+  let ks' s1 b1 = ks (s0 `B.append` bufferBytes b1) (b0 `append` b1)
+   in unGet ga s0 (Just B.empty) m0 kf ks'
 
 -- | Like 'lookAhead', but consume the input if @gma@ returns 'Just _'.
 -- Fails if @gma@ fails.
