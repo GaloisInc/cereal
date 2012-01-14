@@ -145,9 +145,11 @@ type Buffer = Maybe B.ByteString
 
 append :: Buffer -> Buffer -> Buffer
 append l r = B.append `fmap` l <*> r
+{-# INLINE append #-}
 
 bufferBytes :: Buffer -> B.ByteString
 bufferBytes  = fromMaybe B.empty
+{-# INLINE bufferBytes #-}
 
 type Failure   r = Input -> Buffer -> More -> [String] -> String -> Result r
 type Success a r = Input -> Buffer -> More -> a                  -> Result r
@@ -204,9 +206,11 @@ formatTrace ls = "From:\t" ++ intercalate "\n\t" ls ++ "\n"
 
 get :: Get B.ByteString
 get  = Get (\s0 b0 m0 _ k -> k s0 b0 m0 s0)
+{-# INLINE get #-}
 
 put :: B.ByteString -> Get ()
 put s = Get (\_ b0 m _ k -> k s b0 m ())
+{-# INLINE put #-}
 
 label :: String -> Get a -> Get a
 label l m =
@@ -421,6 +425,8 @@ getBytes n = do
         -- (consume,rest) = B.splitAt n s
     put rest
     return consume
+{-# INLINE getBytes #-}
+
 
 
 ------------------------------------------------------------------------
@@ -434,6 +440,7 @@ getPtr n = do
     (fp,o,_) <- B.toForeignPtr `fmap` getBytes n
     let k p = peek (castPtr (p `plusPtr` o))
     return (B.inlinePerformIO (withForeignPtr fp k))
+{-# INLINE getPtr #-}
 
 ------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-GHC	= ghc -O2 -fasm -fforce-recomp -i../src -prof
+GHC	= ghc -O2 -fforce-recomp -i../src
 
 all: bench qc
 
@@ -7,7 +7,7 @@ bench:: Benchmark.hs MemBench.hs CBenchmark.o
 	./$@ 100
 
 bench-prof: Benchmark.hs MemBench.hs CBenchmark.o
-	$(GHC) -auto-all -rtsopts -fliberate-case-threshold=1000 --make Benchmark.hs CBenchmark.o -o $@
+	$(GHC) -prof -auto-all -rtsopts --make Benchmark.hs CBenchmark.o -o $@
 	./$@ 100 +RTS -p
 
 CBenchmark.o: CBenchmark.c
