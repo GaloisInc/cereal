@@ -514,7 +514,8 @@ instance GSerialize a => PutSum (C1 c a) where
 
 ------------------------------------------------------------------------
 
-checkGetSum :: (Ord word, Bits word, GetSum f) => word -> word -> Get (f a)
+checkGetSum :: (Ord word, Num word, Bits word, GetSum f)
+            => word -> word -> Get (f a)
 checkGetSum size code | code < size = getSum code size
                       | otherwise   = fail "Unknown encoding for constructor"
 {-# INLINE checkGetSum #-}
