@@ -504,7 +504,11 @@ instance (PutSum a, PutSum b, GSerialize a, GSerialize b) => PutSum (a :+: b) wh
                              L1 x -> putSum code           sizeL x
                              R1 x -> putSum (code + sizeL) sizeR x
         where
+#if MIN_VERSION_base(4,5,0)
+          sizeL = size `unsafeShiftR` 1
+#else
           sizeL = size `shiftR` 1
+#endif
           sizeR = size - sizeL
     {-# INLINE putSum #-}
 
@@ -527,7 +531,11 @@ instance (GetSum a, GetSum b, GSerialize a, GSerialize b) => GetSum (a :+: b) wh
     getSum !code !size | code < sizeL = L1 <$> getSum code           sizeL
                        | otherwise    = R1 <$> getSum (code - sizeL) sizeR
         where
+#if MIN_VERSION_base(4,5,0)
+          sizeL = size `unsafeShiftR` 1
+#else
           sizeL = size `shiftR` 1
+#endif
           sizeR = size - sizeL
     {-# INLINE getSum #-}
 
