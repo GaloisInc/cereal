@@ -7,7 +7,7 @@
 -- Module      : Data.Serialize.Get
 -- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
--- 
+--
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   :
 -- Portability :
@@ -418,6 +418,7 @@ getLazyByteString n = f `fmap` getByteString (fromIntegral n)
 
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
+getBytes n | n < 0 = fail "getBytes: negative length requested"
 getBytes n = do
     s <- ensure n
     let consume = B.unsafeTake n s
