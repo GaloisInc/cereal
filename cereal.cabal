@@ -27,7 +27,7 @@ description:
 
 source-repository head
   type:     git
-  location: git://code.galois.com/cereal.git
+  location: git://github.com/GaloisInc/cereal.git
 
 flag split-base
         default: True
