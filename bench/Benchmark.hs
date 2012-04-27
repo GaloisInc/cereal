@@ -24,33 +24,33 @@ import qualified Data.Binary as Binary
 -- Benchmark
 ------------------------------------------------------------------------------
 
--- input data (NOINLINE to ensure memoization)
-----------------------------------------------
-
--- | Few-enough repetitions to avoid making GC too expensive.
+-- | The number of repetitions to consider.
 nRepl :: Int
 nRepl = 1000
 
+-- We use NOINLINE to ensure that GHC has no chance of optimizing too much.
+
 {-# NOINLINE intData #-}
-intData :: [Int]
-intData = [start..start +nRepl]
-  where start = 0
+intData :: Int -> [Int]
+intData n = take n [0..]
 
 {-# NOINLINE stringData #-}
-stringData :: [String]
-stringData = take nRepl $ cycle ["hello", "world"]
+stringData :: Int -> [String]
+stringData n = take n $ cycle ["hello", "world"]
 
 -- benchmarks
 -------------
 
 main :: IO ()
 main = Criterion.Main.defaultMain $ 
-    [ benchmarks "[Int]"    intData
-    , benchmarks "[String]" stringData
+    [ benchmarks "[Int] memoized "     id         (intData nRepl)
+    , benchmarks "[Int] generated "    intData    nRepl
+    , benchmarks "[String] memoized"   id         (stringData nRepl)
+    , benchmarks "[String] generated"  stringData nRepl
     ]
   where
-    benchmarks :: (Binary a, Serialize a) => String -> a -> Benchmark
-    benchmarks name x = bgroup (name ++ show nRepl)
-      [ bench "cereal" $ whnf (L.length . encodeLazy) x
-      , bench "binary" $ whnf (L.length . Binary.encode) x
+    benchmarks :: (Binary a, Serialize a) => String -> (b -> a) -> b -> Benchmark
+    benchmarks name f x = bgroup (name ++ show nRepl)
+      [ bench "cereal" $ whnf (L.length . encodeLazy . f)  x
+      , bench "binary" $ whnf (L.length . Binary.encode . f) x
       ]

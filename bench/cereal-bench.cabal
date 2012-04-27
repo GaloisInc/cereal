@@ -17,8 +17,11 @@ cabal-version:       >=1.8
 
 executable cereal-bench
   main-is:           Benchmark.hs
+  hs-source-dirs:    src .
   build-depends:     base
-                     , bytestring
+                     , containers == 0.4.*
+                     , array      == 0.3.*
+                     , bytestring == 0.9.*
                      , criterion
-                     , cereal == 0.3.*
-                     , binary == 0.5.*
+                     , cereal     == 0.3.*
+                     , binary     == 0.5.*

@@ -70,6 +70,7 @@ import qualified Data.Serialize.Builder as B
 import Control.Applicative
 import Data.Array.Unboxed
 import Data.Monoid
+import Data.Foldable (foldMap)
 import Data.Word
 import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
@@ -256,11 +257,9 @@ putTwoOf pa pb (a,b) = pa a >> pb b
 {-# INLINE putTwoOf #-}
 
 putListOf :: Putter a -> Putter [a]
-putListOf pa = go 0 (return ())
-  where
-  go n body []     = putWord64be n >> body
-  go n body (x:xs) = n' `seq` go n' (body >> pa x) xs
-    where n' = n + 1
+putListOf pa = \xs -> do
+    putWord64be (fromIntegral $ length xs) 
+    tell (foldMap (execPut . pa) xs)
 {-# INLINE putListOf #-}
 
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
