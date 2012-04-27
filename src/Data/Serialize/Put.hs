@@ -269,12 +269,9 @@ putIArrayOf pix pe a = do
 {-# INLINE putIArrayOf #-}
 
 putSeqOf :: Putter a -> Putter (Seq.Seq a)
-putSeqOf pa = go 0 (return ())
-  where
-  go n body s = case Seq.viewl s of
-    Seq.EmptyL  -> putWord64be n >> body
-    a Seq.:< as -> n' `seq` go n' (body >> pa a) as
-      where n' = n + 1
+putSeqOf pa = \s -> do
+    putWord64be (fromIntegral $ Seq.length s) 
+    tell (foldMap (execPut . pa) s)
 {-# INLINE putSeqOf #-}
 
 putTreeOf :: Putter a -> Putter (T.Tree a)

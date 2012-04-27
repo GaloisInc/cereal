@@ -19,6 +19,8 @@ import           Data.Serialize
 import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
 
+import qualified Data.Sequence as Seq
+
 
 ------------------------------------------------------------------------------
 -- Benchmark
@@ -38,12 +40,17 @@ intData n = take n [0..]
 stringData :: Int -> [String]
 stringData n = take n $ cycle ["hello", "world"]
 
+{-# NOINLINE seqIntData #-}
+seqIntData :: Int -> Seq.Seq Int
+seqIntData = Seq.fromList . intData
+
 -- benchmarks
 -------------
 
 main :: IO ()
 main = Criterion.Main.defaultMain $ 
-    [ benchmarks "[Int] memoized "     id         (intData nRepl)
+    [ benchmarks "Seq Int memoized "   id         (seqIntData nRepl)
+    , benchmarks "[Int] memoized "     id         (intData nRepl)
     , benchmarks "[Int] generated "    intData    nRepl
     , benchmarks "[String] memoized"   id         (stringData nRepl)
     , benchmarks "[String] generated"  stringData nRepl
