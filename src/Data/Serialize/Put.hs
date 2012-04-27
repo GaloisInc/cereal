@@ -252,14 +252,18 @@ putWord64host       = tell . B.putWord64host
 
 -- Containers ------------------------------------------------------------------
 
+encodeListOf :: (a -> Builder) -> [a] -> Builder
+encodeListOf f = -- allow inlining with just a single argument
+    \xs ->  execPut (putWord64be (fromIntegral $ length xs)) `mappend`
+            foldMap f xs
+{-# INLINE encodeListOf #-}
+
 putTwoOf :: Putter a -> Putter b -> Putter (a,b)
 putTwoOf pa pb (a,b) = pa a >> pb b
 {-# INLINE putTwoOf #-}
 
 putListOf :: Putter a -> Putter [a]
-putListOf pa = \xs -> do
-    putWord64be (fromIntegral $ length xs) 
-    tell (foldMap (execPut . pa) xs)
+putListOf pa = tell . encodeListOf (execPut . pa)
 {-# INLINE putListOf #-}
 
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
@@ -275,7 +279,10 @@ putSeqOf pa = \s -> do
 {-# INLINE putSeqOf #-}
 
 putTreeOf :: Putter a -> Putter (T.Tree a)
-putTreeOf pa (T.Node r s) = pa r >> putListOf (putTreeOf pa) s
+putTreeOf pa = 
+    tell . go
+  where
+    go (T.Node x cs) = execPut (pa x) `mappend` encodeListOf go cs
 {-# INLINE putTreeOf #-}
 
 putMapOf :: Ord k => Putter k -> Putter a -> Putter (Map.Map k a)

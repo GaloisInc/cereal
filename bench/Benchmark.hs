@@ -20,6 +20,7 @@ import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
 
 import qualified Data.Sequence as Seq
+import           Data.Tree
 
 
 ------------------------------------------------------------------------------
@@ -44,12 +45,27 @@ stringData n = take n $ cycle ["hello", "world"]
 seqIntData :: Int -> Seq.Seq Int
 seqIntData = Seq.fromList . intData
 
+-- | Build a balanced binary tree.
+{-# NOINLINE treeIntData #-}
+treeIntData :: Int -> Tree Int
+treeIntData n = 
+   head $ go [0..n]  -- assuming n >= 0
+  where
+   go []  = []
+   go [x] = [Node x []]
+   go xs  =
+       [Node r $ concatMap go [ls, rs]]
+     where
+       (ls, r:rs) = splitAt (length xs `div` 2) xs
+
+
 -- benchmarks
 -------------
 
 main :: IO ()
 main = Criterion.Main.defaultMain $ 
-    [ benchmarks "Seq Int memoized "   id         (seqIntData nRepl)
+    [ benchmarks "Tree Int memoized "  id         (treeIntData nRepl)
+    , benchmarks "Seq Int memoized "   id         (seqIntData nRepl)
     , benchmarks "[Int] memoized "     id         (intData nRepl)
     , benchmarks "[Int] generated "    intData    nRepl
     , benchmarks "[String] memoized"   id         (stringData nRepl)
