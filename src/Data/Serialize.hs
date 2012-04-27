@@ -364,12 +364,12 @@ instance (Serialize a, Serialize b) => Serialize (Either a b) where
 -- ByteStrings (have specially efficient instances)
 
 instance Serialize B.ByteString where
-    put bs = do put (B.length bs)
+    put bs = do put (B.length bs :: Int)
                 putByteString bs
     get    = get >>= getByteString
 
 instance Serialize L.ByteString where
-    put bs = do put (fromIntegral (L.length bs) :: Int)
+    put bs = do put (L.length bs :: Int64)
                 putLazyByteString bs
     get    = get >>= getLazyByteString
 
