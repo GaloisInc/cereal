@@ -83,8 +83,8 @@ import qualified Data.Tree              as T
 
 ------------------------------------------------------------------------
 
--- XXX Strict in buffer only. 
-data PairS a = PairS a {-# UNPACK #-}!Builder
+-- XXX Strict in builder only. 
+data PairS a = PairS a !Builder
 
 sndS :: PairS a -> Builder
 sndS (PairS _ b) = b
