@@ -268,9 +268,9 @@ runGetLazy' m lstr = loop run (L.toChunks lstr)
       Done r c'  -> (Right r,L.fromChunks (c':cs))
 
     [] -> case k B.empty of
-      Fail str   -> (Left str,L.empty)
-      Partial k' -> (Left "Failed reading: Internal error: unexpected end of input",L.empty)
-      Done r c'  -> (Right r,L.empty)
+      Fail str  -> (Left str,L.empty)
+      Partial _ -> (Left "Failed reading: Internal error: unexpected end of input",L.empty)
+      Done r _  -> (Right r,L.empty)
 
 {-# INLINE runGetLazy' #-}
 
