@@ -260,12 +260,18 @@ runGetLazy' m lstr = loop run (L.toChunks lstr)
   remLen c = fromIntegral (L.length lstr) - B.length c
   run str  = unGet m str Nothing (Incomplete (Just (remLen str))) failK finalK
 
-  loop _ []     =
-    (Left "Failed reading: Internal error: unexpected end of input",L.empty)
-  loop k (c:cs) = case k c of
-    Fail str   -> (Left str,L.empty)
-    Partial k' -> loop k' cs
-    Done r c'  -> (Right r,L.fromChunks (c':cs))
+  loop k chunks = case chunks of
+
+    c:cs -> case k c of
+      Fail str   -> (Left str,L.empty)
+      Partial k' -> loop k' cs
+      Done r c'  -> (Right r,L.fromChunks (c':cs))
+
+    [] -> case k B.empty of
+      Fail str   -> (Left str,L.empty)
+      Partial k' -> (Left "Failed reading: Internal error: unexpected end of input",L.empty)
+      Done r c'  -> (Right r,L.empty)
+
 {-# INLINE runGetLazy' #-}
 
 -- | Run the Get monad over a Lazy ByteString.  Note that this will not run the
