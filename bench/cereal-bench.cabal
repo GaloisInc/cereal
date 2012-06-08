@@ -20,7 +20,7 @@ executable cereal-bench
   hs-source-dirs:    src .
   build-depends:     base
                      , containers == 0.4.*
-                     , array      == 0.3.*
+                     , array      >= 0.3 && < 0.5
                      , bytestring == 0.9.*
                      , criterion
                      , cereal     == 0.3.*
