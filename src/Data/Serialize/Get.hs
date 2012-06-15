@@ -112,7 +112,7 @@ import GHC.Word
 #endif
 
 -- | The result of a parse.
-data Result r = Fail String
+data Result r = Fail String B.ByteString
               -- ^ The parse failed. The 'String' is the
               --   message describing the error, if any.
               | Partial (B.ByteString -> Result r)
@@ -125,14 +125,14 @@ data Result r = Fail String
               --   the parse succeeded.
 
 instance Show r => Show (Result r) where
-    show (Fail msg)  = "Fail " ++ show msg
-    show (Partial _) = "Partial _"
-    show (Done r bs) = "Done " ++ show r ++ " " ++ show bs
+    show (Fail msg _) = "Fail " ++ show msg
+    show (Partial _)  = "Partial _"
+    show (Done r bs)  = "Done " ++ show r ++ " " ++ show bs
 
 instance Functor Result where
-    fmap _ (Fail msg)  = Fail msg
-    fmap f (Partial k) = Partial (fmap f . k)
-    fmap f (Done r bs) = Done (f r) bs
+    fmap _ (Fail msg rest) = Fail msg rest
+    fmap f (Partial k)     = Partial (fmap f . k)
+    fmap f (Done r bs)     = Done (f r) bs
 
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
@@ -222,13 +222,14 @@ finalK :: Success a a
 finalK s _ _ a = Done a s
 
 failK :: Failure a
-failK _ _ _ ls s = Fail (unlines [s, formatTrace ls])
+failK s b _ ls msg =
+  Fail (unlines [msg, formatTrace ls]) (s `B.append` bufferBytes b)
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
 runGet m str =
   case unGet m str Nothing Complete failK finalK of
-    Fail i    -> Left i
+    Fail i _  -> Left i
     Done a _  -> Right a
     Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
@@ -244,12 +245,23 @@ runGetPartial m str =
 -- consumed bytes and the rest of the input.
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString)
-runGetState m str off =
-    case unGet m (B.drop off str) Nothing Complete failK finalK of
-      Fail i      -> Left i
-      Done a bs   -> Right (a, bs)
-      Partial{}   -> Left "Failed reading: Internal error: unexpected Partial."
+runGetState m str off = case runGetState' m str off of
+  (Right a,bs) -> Right (a,bs)
+  (Left i,_)   -> Left i
 {-# INLINE runGetState #-}
+
+-- | Run the Get monad applies a 'get'-based parser on the input
+-- ByteString. Additional to the result of get it returns the number of
+-- consumed bytes and the rest of the input, even in the event of a failure.
+runGetState' :: Get a -> B.ByteString -> Int
+             -> (Either String a, B.ByteString)
+runGetState' m str off =
+  case unGet m (B.drop off str) Nothing Complete failK finalK of
+    Fail i bs -> (Left i,bs)
+    Done a bs -> (Right a, bs)
+    Partial{} -> (Left "Failed reading: Internal error: unexpected Partial.",B.empty)
+{-# INLINE runGetState' #-}
+
 
 
 -- Lazy Get --------------------------------------------------------------------
@@ -263,15 +275,14 @@ runGetLazy' m lstr = loop run (L.toChunks lstr)
   loop k chunks = case chunks of
 
     c:cs -> case k c of
-      Fail str   -> (Left str,L.empty)
-      Partial k' -> loop k' cs
-      Done r c'  -> (Right r,L.fromChunks (c':cs))
+      Fail str rest -> (Left str,L.fromChunks [rest])
+      Partial k'    -> loop k' cs
+      Done r c'     -> (Right r,L.fromChunks (c':cs))
 
     [] -> case k B.empty of
-      Fail str  -> (Left str,L.empty)
-      Partial _ -> (Left "Failed reading: Internal error: unexpected end of input",L.empty)
-      Done r _  -> (Right r,L.empty)
-
+      Fail str rest -> (Left str,L.fromChunks [rest])
+      Partial _     -> (Left "Failed reading: Internal error: unexpected end of input",L.empty)
+      Done r rest   -> (Right r,L.fromChunks [rest])
 {-# INLINE runGetLazy' #-}
 
 -- | Run the Get monad over a Lazy ByteString.  Note that this will not run the
