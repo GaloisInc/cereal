@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 -- | IEEE-754 parsing, as described in this stack-overflow article:
 --
@@ -23,10 +24,16 @@ module Data.Serialize.IEEE754 (
 import Control.Applicative ( (<$>) )
 import Control.Monad.ST ( runST, ST )
 
-import Data.Array.ST ( newArray, castSTUArray, readArray, MArray, STUArray )
+import Data.Array.ST ( newArray, readArray, MArray, STUArray )
 import Data.Word ( Word32, Word64 )
 import Data.Serialize.Get
 import Data.Serialize.Put
+
+#if __GLASGOW_HASKELL__ >= 704
+import Data.Array.Unsafe (castSTUArray)
+#else
+import Data.Array.ST (castSTUArray)
+#endif
 
 -- | Read a Float in little endian IEEE-754 format
 getFloat32le :: Get Float
