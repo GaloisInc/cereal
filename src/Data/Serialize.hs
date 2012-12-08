@@ -55,6 +55,7 @@ import Foreign
 import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map             as Map
+import qualified Data.Monoid          as M
 import qualified Data.Set             as Set
 import qualified Data.IntMap          as IntMap
 import qualified Data.IntSet          as IntSet
@@ -344,6 +345,37 @@ instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e,
     put (a,b,c,d,e,f,g,h,i,j) = put (a,(b,c,d,e,f,g,h,i,j))
     get                       = do (a,(b,c,d,e,f,g,h,i,j)) <- get
                                    return (a,b,c,d,e,f,g,h,i,j)
+
+------------------------------------------------------------------------
+-- Monoid newtype wrappers
+
+instance Serialize a => Serialize (M.Dual a) where
+    put = put . M.getDual
+    get = fmap M.Dual get
+
+instance Serialize M.All where
+    put = put . M.getAll
+    get = fmap M.All get
+
+instance Serialize M.Any where
+    put = put . M.getAny
+    get = fmap M.Any get
+
+instance Serialize a => Serialize (M.Sum a) where
+    put = put . M.getSum
+    get = fmap M.Sum get
+
+instance Serialize a => Serialize (M.Product a) where
+    put = put . M.getProduct
+    get = fmap M.Product get
+
+instance Serialize a => Serialize (M.First a) where
+    put = put . M.getFirst
+    get = fmap M.First get
+
+instance Serialize a => Serialize (M.Last a) where
+    put = put . M.getLast
+    get = fmap M.Last get
 
 ------------------------------------------------------------------------
 -- Container types
