@@ -57,5 +57,5 @@ library
                                 Rank2Types,
                                 MagicHash
 
-        ghc-options:            -Wall -funbox-strict-fields
+        ghc-options:            -Wall -O2 -funbox-strict-fields
         ghc-prof-options:       -prof -auto-all
