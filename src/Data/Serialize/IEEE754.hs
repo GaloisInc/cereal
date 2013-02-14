@@ -3,7 +3,7 @@
 
 -- | IEEE-754 parsing, as described in this stack-overflow article:
 --
--- http://stackoverflow.com/questions/6976684/converting-ieee-754-floating-point-in-haskell-word32-64-to-and-from-haskell-float/7002812#7002812
+-- <http://stackoverflow.com/questions/6976684/converting-ieee-754-floating-point-in-haskell-word32-64-to-and-from-haskell-float/7002812#7002812>
 
 module Data.Serialize.IEEE754 (
 
