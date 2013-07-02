@@ -3,12 +3,11 @@
 {-# LANGUAGE CPP #-}
 
 #ifdef GENERICS
-{-# LANGUAGE DefaultSignatures
-           , TypeOperators
-           , BangPatterns
-           , KindSignatures
-           , ScopedTypeVariables
-  #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 #endif
 
 -----------------------------------------------------------------------------
@@ -16,7 +15,7 @@
 -- Module      : Data.Serialize
 -- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
--- 
+--
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   :
 -- Portability :
@@ -188,7 +187,7 @@ instance Serialize Int where
     get     = liftM fromIntegral (get :: Get Int64)
 
 ------------------------------------------------------------------------
--- 
+--
 -- Portable, and pretty efficient, serialisation of Integer
 --
 
@@ -309,7 +308,7 @@ instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e)
     put (a,b,c,d,e)     = put a >> put b >> put c >> put d >> put e
     get                 = liftM5 (,,,,) get get get get get
 
--- 
+--
 -- and now just recurse:
 --
 
