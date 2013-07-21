@@ -7,8 +7,7 @@
            , TypeOperators
            , BangPatterns
            , KindSignatures
-           , ScopedTypeVariables
-  #-}
+           , ScopedTypeVariables #-}
 #endif
 
 -----------------------------------------------------------------------------
