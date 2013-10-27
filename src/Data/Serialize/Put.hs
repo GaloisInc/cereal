@@ -130,6 +130,12 @@ instance Monad PutM where
         in PairS b (w `mappend` w')
     {-# INLINE (>>) #-}
 
+instance Monoid Put where
+  mempty = return ()
+  {-# INLINE mempty #-}
+  mappend a b = a >> b
+  {-# INLINE mappend #-}
+
 tell :: Putter Builder
 tell b = Put $ PairS () b
 {-# INLINE tell #-}
