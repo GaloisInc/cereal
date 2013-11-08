@@ -622,19 +622,31 @@ getTreeOf m = liftM2 T.Node m (getListOf (getTreeOf m))
 
 -- | Read as a list of pairs of key and element.
 getMapOf :: Ord k => Get k -> Get a -> Get (Map.Map k a)
-getMapOf k m = Map.fromDistinctAscList `fmap` getListOf (getTwoOf k m)
+getMapOf k m = do
+  l <- getListOf (getTwoOf k m)
+  unless (sorted (map fst l)) (fail "invalid Data.Map")
+  return (Map.fromDistinctAscList l)
 
 -- | Read as a list of pairs of int and element.
 getIntMapOf :: Get Int -> Get a -> Get (IntMap.IntMap a)
-getIntMapOf i m = IntMap.fromDistinctAscList `fmap` getListOf (getTwoOf i m)
+getIntMapOf i m = do
+  l <- getListOf (getTwoOf i m)
+  unless (sorted (map fst l)) (fail "invalid Data.IntMap")
+  return (IntMap.fromDistinctAscList l)
 
 -- | Read as a list of elements.
 getSetOf :: Ord a => Get a -> Get (Set.Set a)
-getSetOf m = Set.fromDistinctAscList `fmap` getListOf m
+getSetOf m = do
+  l <- getListOf m
+  unless (sorted l) (fail "invalid Data.Set")
+  return (Set.fromDistinctAscList l)
 
 -- | Read as a list of ints.
 getIntSetOf :: Get Int -> Get IntSet.IntSet
-getIntSetOf m = IntSet.fromDistinctAscList `fmap` getListOf m
+getIntSetOf m = do
+  l <- getListOf m
+  unless (sorted l) (fail "invalid Data.IntSet")
+  return (IntSet.fromDistinctAscList l)
 
 -- | Read in a Maybe in the following format:
 --   Word8 (0 for Nothing, anything else for Just)
@@ -655,3 +667,6 @@ getEitherOf ma mb = do
   case tag of
     0 -> Left  `fmap` ma
     _ -> Right `fmap` mb
+
+sorted :: Ord a => [a] -> Bool
+sorted l = and (zipWith (<) l (tail l))
