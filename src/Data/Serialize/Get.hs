@@ -638,14 +638,14 @@ getIntMapOf i m = do
 getSetOf :: Ord a => Get a -> Get (Set.Set a)
 getSetOf m = do
   l <- getListOf m
-  unless (sorted l) (fail "Failed reading: invalid Data.Set")
+  unless (sorted l) (fail "invalid Data.Set")
   return (Set.fromDistinctAscList l)
 
 -- | Read as a list of ints.
 getIntSetOf :: Get Int -> Get IntSet.IntSet
 getIntSetOf m = do
   l <- getListOf m
-  unless (sorted l) (fail "Failed reading: invalid Data.IntSet")
+  unless (sorted l) (fail "invalid Data.IntSet")
   return (IntSet.fromDistinctAscList l)
 
 -- | Read in a Maybe in the following format:
