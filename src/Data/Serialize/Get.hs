@@ -622,19 +622,19 @@ getTreeOf m = liftM2 T.Node m (getListOf (getTreeOf m))
 
 -- | Read as a list of pairs of key and element.
 getMapOf :: Ord k => Get k -> Get a -> Get (Map.Map k a)
-getMapOf k m = Map.fromDistinctAscList `fmap` getListOf (getTwoOf k m)
+getMapOf k m = Map.fromList `fmap` getListOf (getTwoOf k m)
 
 -- | Read as a list of pairs of int and element.
 getIntMapOf :: Get Int -> Get a -> Get (IntMap.IntMap a)
-getIntMapOf i m = IntMap.fromDistinctAscList `fmap` getListOf (getTwoOf i m)
+getIntMapOf i m = IntMap.fromList `fmap` getListOf (getTwoOf i m)
 
 -- | Read as a list of elements.
 getSetOf :: Ord a => Get a -> Get (Set.Set a)
-getSetOf m = Set.fromDistinctAscList `fmap` getListOf m
+getSetOf m = Set.fromList `fmap` getListOf m
 
 -- | Read as a list of ints.
 getIntSetOf :: Get Int -> Get IntSet.IntSet
-getIntSetOf m = IntSet.fromDistinctAscList `fmap` getListOf m
+getIntSetOf m = IntSet.fromList `fmap` getListOf m
 
 -- | Read in a Maybe in the following format:
 --   Word8 (0 for Nothing, anything else for Just)
