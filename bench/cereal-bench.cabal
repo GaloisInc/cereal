@@ -23,5 +23,5 @@ executable cereal-bench
                      , array      >= 0.3 && < 0.5
                      , bytestring >= 0.9
                      , criterion
-                     , cereal     == 0.4.0.0
+                     , cereal     == 0.4.0.1
                      , binary     >= 0.5
