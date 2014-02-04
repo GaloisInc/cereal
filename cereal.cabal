@@ -33,7 +33,7 @@ flag split-base
         default: True
 
 library
-        build-depends:          bytestring
+        build-depends:          bytestring, mtl
         if flag(split-base)
                 build-depends:  base == 4.*, containers, array
         else
@@ -49,7 +49,10 @@ library
                                 Data.Serialize.Put,
                                 Data.Serialize.Get,
                                 Data.Serialize.Builder,
-                                Data.Serialize.IEEE754
+                                Data.Serialize.IEEE754,
+                                Data.SerializeM,
+                                Data.SerializeM.PutT,
+                                Data.SerializeM.GetT
 
         extensions:             CPP,
                                 FlexibleContexts,
