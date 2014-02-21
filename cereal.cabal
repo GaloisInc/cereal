@@ -20,10 +20,7 @@ extra-source-files:     tests/Benchmark.hs,
                         tests/Tests.hs
 description:
   A binary serialization library, similar to binary, that introduces an isolate
-  primitive for parser isolation, and replaces the asynchronous errors with a
-  user-handleable Either type.  Similar to binary in performance, but uses a
-  strict ByteString instead of a lazy ByteString, thus restricting it to
-  operating on finite inputs.
+  primitive for parser isolation, and labeled blocks for better error messages.
 
 source-repository head
   type:     git
