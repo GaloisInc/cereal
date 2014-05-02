@@ -33,6 +33,7 @@ module Data.Serialize (
     , encode, encodeLazy
     , decode, decodeLazy
 
+    , expect
     , module Data.Serialize.Get
     , module Data.Serialize.Put
     , module Data.Serialize.IEEE754
@@ -111,6 +112,16 @@ decode = runGet get
 -- structure.
 decodeLazy :: Serialize a => L.ByteString -> Either String a
 decodeLazy  = runGetLazy get
+
+
+------------------------------------------------------------------------
+-- Combinators
+
+-- | Perform an action, failing if the read result does not match the argument
+--   provided.
+expect :: (Eq a, Serialize a) => a -> Get a
+expect x = get >>= \y -> if x == y then return x else mzero
+
 
 ------------------------------------------------------------------------
 -- Simple instances

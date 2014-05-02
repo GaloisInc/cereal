@@ -34,7 +34,6 @@ module Data.Serialize.Get (
 
     -- * Parsing
     , ensure
-    , expect
     , isolate
     , label
     , skip
@@ -318,11 +317,6 @@ ensureRec n = Get $ \s0 b0 m0 kf ks ->
     if B.length s0 >= n
     then ks s0 b0 m0 s0
     else unGet (demandInput >> ensureRec n) s0 b0 m0 kf ks
-
--- | Perform an action, failing if the read result does not match the argument
---   provided.
-expect :: (Eq a, Serialize a) => a -> Get a
-expect x = get >>= \y -> if x == y then return x else empty
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
