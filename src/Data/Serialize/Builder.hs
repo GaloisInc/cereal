@@ -67,7 +67,7 @@ import qualified Data.ByteString.Lazy     as L
 import qualified Data.ByteString.Internal as S
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
-import GHC.Base
+import GHC.Base (Int(..), uncheckedShiftRL#)
 import GHC.Word (Word32(..),Word16(..),Word64(..))
 
 #if WORD_SIZE_IN_BITS < 64 && __GLASGOW_HASKELL__ >= 608
