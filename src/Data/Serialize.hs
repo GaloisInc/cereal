@@ -255,6 +255,14 @@ instance (Serialize a,Integral a) => Serialize (R.Ratio a) where
 
 ------------------------------------------------------------------------
 
+-- Safely wrap `chr` to avoid exceptions. 
+-- `chr` source: http://hackage.haskell.org/package/base-4.7.0.2/docs/src/GHC-Char.html#chr
+chrEither :: Int -> Either String Char
+chrEither i
+  | i <= 0x10FFFF = Right (chr i) -- Or: C# (chr# i#)
+  | otherwise =
+     Left ("bad argument: " ++ show i)
+
 -- Char is serialised as UTF-8
 instance Serialize Char where
     put a | c <= 0x7f     = put (fromIntegral c :: Word8)
