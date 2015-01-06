@@ -308,7 +308,7 @@ instance Serialize Char where
             Right r' -> 
                 return $! r'
             Left err ->
-                error err
+                fail err
 
 ------------------------------------------------------------------------
 -- Instances for the first few tuples
