@@ -304,7 +304,11 @@ instance Serialize Char where
                                 z <- liftM (xor 0x80) getByte
                                 return (z .|. shiftL6 (y .|. shiftL6
                                         (x .|. shiftL6 (xor 0xf0 w))))
-        return $! chr r
+        case chrEither r of
+            Right r' -> 
+                return $! r'
+            Left err ->
+                error err
 
 ------------------------------------------------------------------------
 -- Instances for the first few tuples
