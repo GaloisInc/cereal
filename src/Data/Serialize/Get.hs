@@ -42,6 +42,7 @@ module Data.Serialize.Get (
     , lookAheadM
     , lookAheadE
     , uncheckedLookAhead
+    , tryGet
 
     -- * Utility
     , getBytes
@@ -392,6 +393,10 @@ uncheckedLookAhead :: Int -> Get B.ByteString
 uncheckedLookAhead n = do
     s <- get
     return (B.take n s)
+
+-- | Try to get a value and return it, or return nothing on failure.
+tryGet :: Get a -> Get (Maybe a)
+tryGet m = (Just `fmap` m) `mplus` return Nothing
 
 ------------------------------------------------------------------------
 -- Utility
