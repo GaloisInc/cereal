@@ -42,6 +42,7 @@ module Data.Serialize.Get (
     , lookAheadM
     , lookAheadE
     , uncheckedLookAhead
+    , tryGet
 
     -- * Utility
     , getBytes
@@ -83,6 +84,7 @@ module Data.Serialize.Get (
     , getIntSetOf
     , getMaybeOf
     , getEitherOf
+    , getNested
 
   ) where
 
@@ -392,6 +394,10 @@ uncheckedLookAhead n = do
     s <- get
     return (B.take n s)
 
+-- | Try to get a value and return it, or return nothing on failure.
+tryGet :: Get a -> Get (Maybe a)
+tryGet m = (Just `fmap` m) `mplus` return Nothing
+
 ------------------------------------------------------------------------
 -- Utility
 
@@ -651,3 +657,10 @@ getEitherOf ma mb = do
   case tag of
     0 -> Left  `fmap` ma
     _ -> Right `fmap` mb
+
+-- | Read in a length and then read a nested structure
+--   of that length. 
+getNested :: Get Int -> Get a -> Get a
+getNested getLen getVal = do
+    n <- getLen
+    isolate n getVal
