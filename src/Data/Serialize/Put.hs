@@ -61,6 +61,7 @@ module Data.Serialize.Put (
     , putIntSetOf
     , putMaybeOf
     , putEitherOf
+    , putNested
 
   ) where
 
@@ -310,3 +311,11 @@ putEitherOf :: Putter a -> Putter b -> Putter (Either a b)
 putEitherOf pa _  (Left a)  = putWord8 0 >> pa a
 putEitherOf _  pb (Right b) = putWord8 1 >> pb b
 {-# INLINE putEitherOf #-}
+
+-- | Put a nested structure by first putting a length
+--   field and then putting the encoded value.
+putNested :: Putter Int -> Put -> Put
+putNested putLen putVal = do
+    let bs = runPut putVal
+    putLen (S.length bs)
+    putByteString bs
