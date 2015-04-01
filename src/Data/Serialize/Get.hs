@@ -83,6 +83,7 @@ module Data.Serialize.Get (
     , getIntSetOf
     , getMaybeOf
     , getEitherOf
+    , getNested
 
   ) where
 
@@ -651,3 +652,10 @@ getEitherOf ma mb = do
   case tag of
     0 -> Left  `fmap` ma
     _ -> Right `fmap` mb
+
+-- | Read in a length and then read a nested structure
+--   of that length. 
+getNested :: Get Int -> Get a -> Get a
+getNested getLen getVal = do
+    n <- getLen
+    isolate n getVal
