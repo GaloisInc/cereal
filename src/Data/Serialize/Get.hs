@@ -87,7 +87,7 @@ module Data.Serialize.Get (
   ) where
 
 import Control.Applicative (Applicative(..),Alternative(..))
-import Control.Monad (unless,when,ap,MonadPlus(..),liftM2)
+import Control.Monad (unless,when,MonadPlus(..),liftM2)
 import Data.Array.IArray (IArray,listArray)
 import Data.Ix (Ix)
 import Data.List (intercalate)
@@ -166,37 +166,53 @@ moreLength m = case m of
   Incomplete mb -> fromMaybe 0 mb
 
 instance Functor Get where
-    fmap p m =
-      Get $ \s0 b0 m0 kf ks ->
-        let ks' s1 b1 m1 a = ks s1 b1 m1 (p a)
-         in unGet m s0 b0 m0 kf ks'
+    fmap p m =        Get $ \ s0 b0 m0 kf ks ->
+      unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> ks s1 b1 m1 (p a)
 
 instance Applicative Get where
     pure  = return
-    (<*>) = ap
+    {-# INLINE pure #-}
+
+    f <*> x =         Get $ \ s0 b0 m0 kf ks ->
+      unGet f s0 b0 m0 kf $ \ s1 b1 m1 g     ->
+      unGet x s1 b1 m1 kf $ \ s2 b2 m2 y     -> ks s2 b2 m2 (g y)
+    {-# INLINE (<*>) #-}
 
 instance Alternative Get where
     empty = failDesc "empty"
+    {-# INLINE empty #-}
+
     (<|>) = mplus
+    {-# INLINE (<|>) #-}
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
     return a = Get $ \ s0 b0 m0 _ ks -> ks s0 b0 m0 a
+    {-# INLINE return #-}
 
-    m >>= g  =
-      Get $ \s0 b0 m0 kf ks ->
-        let ks' s1 b1 m1 a = unGet (g a) s1 b1 m1 kf ks
-         in unGet m s0 b0 m0 kf ks'
+    m >>= g  =        Get $ \ s0 b0 m0 kf ks ->
+      unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> unGet (g a) s1 b1 m1 kf ks
+    {-# INLINE (>>=) #-}
+
+    m >> k =          Get $ \ s0 b0 m0 kf ks ->
+      unGet m s0 b0 m0 kf $ \ s1 b1 m1 _     -> unGet k s1 b1 m1 kf ks
+    {-# INLINE (>>) #-}
 
     fail     = failDesc
+    {-# INLINE fail #-}
+
 
 instance MonadPlus Get where
     mzero     = failDesc "mzero"
+    {-# INLINE mzero #-}
+
     mplus a b =
       Get $ \s0 b0 m0 kf ks ->
         let kf' _ b1 m1 _ _ = unGet b (s0 `B.append` bufferBytes b1)
                                       (b0 `append` b1) m1 kf ks
          in unGet a s0 (Just B.empty) m0 kf' ks
+    {-# INLINE mplus #-}
+
 
 ------------------------------------------------------------------------
 

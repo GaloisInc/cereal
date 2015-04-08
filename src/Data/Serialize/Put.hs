@@ -64,8 +64,9 @@ module Data.Serialize.Put (
 
   ) where
 
-import Data.Serialize.Builder (Builder, toByteString, toLazyByteString)
-import qualified Data.Serialize.Builder as B
+import Data.ByteString.Builder (Builder, toLazyByteString)
+import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Builder.Extra as B
 
 import Control.Applicative
 import Data.Array.Unboxed
@@ -145,12 +146,12 @@ execPut = sndS . unPut
 
 -- | Run the 'Put' monad with a serialiser
 runPut :: Put -> S.ByteString
-runPut = toByteString . sndS . unPut
+runPut = L.toStrict . runPutLazy
 {-# INLINE runPut #-}
 
 -- | Run the 'Put' monad with a serialiser and get its result
 runPutM :: PutM a -> (a, S.ByteString)
-runPutM (Put (PairS f s)) = (f, toByteString s)
+runPutM (Put (PairS f s)) = (f, L.toStrict (toLazyByteString s))
 {-# INLINE runPutM #-}
 
 -- | Run the 'Put' monad with a serialiser
@@ -173,49 +174,49 @@ flush               = tell B.flush
 
 -- | Efficiently write a byte into the output buffer
 putWord8            :: Putter Word8
-putWord8            = tell . B.singleton
+putWord8            = tell . B.word8
 {-# INLINE putWord8 #-}
 
 -- | An efficient primitive to write a strict ByteString into the output buffer.
 -- It flushes the current buffer, and writes the argument into a new chunk.
 putByteString       :: Putter S.ByteString
-putByteString       = tell . B.fromByteString
+putByteString       = tell . B.byteString
 {-# INLINE putByteString #-}
 
 -- | Write a lazy ByteString efficiently, simply appending the lazy
 -- ByteString chunks to the output buffer
 putLazyByteString   :: Putter L.ByteString
-putLazyByteString   = tell . B.fromLazyByteString
+putLazyByteString   = tell . B.lazyByteString
 {-# INLINE putLazyByteString #-}
 
 -- | Write a Word16 in big endian format
 putWord16be         :: Putter Word16
-putWord16be         = tell . B.putWord16be
+putWord16be         = tell . B.word16BE
 {-# INLINE putWord16be #-}
 
 -- | Write a Word16 in little endian format
 putWord16le         :: Putter Word16
-putWord16le         = tell . B.putWord16le
+putWord16le         = tell . B.word16LE
 {-# INLINE putWord16le #-}
 
 -- | Write a Word32 in big endian format
 putWord32be         :: Putter Word32
-putWord32be         = tell . B.putWord32be
+putWord32be         = tell . B.word32BE
 {-# INLINE putWord32be #-}
 
 -- | Write a Word32 in little endian format
 putWord32le         :: Putter Word32
-putWord32le         = tell . B.putWord32le
+putWord32le         = tell . B.word32LE
 {-# INLINE putWord32le #-}
 
 -- | Write a Word64 in big endian format
 putWord64be         :: Putter Word64
-putWord64be         = tell . B.putWord64be
+putWord64be         = tell . B.word64BE
 {-# INLINE putWord64be #-}
 
 -- | Write a Word64 in little endian format
 putWord64le         :: Putter Word64
-putWord64le         = tell . B.putWord64le
+putWord64le         = tell . B.word64LE
 {-# INLINE putWord64le #-}
 
 ------------------------------------------------------------------------
@@ -227,26 +228,26 @@ putWord64le         = tell . B.putWord64le
 -- different endian or word sized machines, without conversion.
 --
 putWordhost         :: Putter Word
-putWordhost         = tell . B.putWordhost
+putWordhost         = tell . B.wordHost
 {-# INLINE putWordhost #-}
 
 -- | /O(1)./ Write a Word16 in native host order and host endianness.
 -- For portability issues see @putWordhost@.
 putWord16host       :: Putter Word16
-putWord16host       = tell . B.putWord16host
+putWord16host       = tell . B.word16Host
 {-# INLINE putWord16host #-}
 
 -- | /O(1)./ Write a Word32 in native host order and host endianness.
 -- For portability issues see @putWordhost@.
 putWord32host       :: Putter Word32
-putWord32host       = tell . B.putWord32host
+putWord32host       = tell . B.word32Host
 {-# INLINE putWord32host #-}
 
 -- | /O(1)./ Write a Word64 in native host order
 -- On a 32 bit machine we write two host order Word32s, in big endian form.
 -- For portability issues see @putWordhost@.
 putWord64host       :: Putter Word64
-putWord64host       = tell . B.putWord64host
+putWord64host       = tell . B.word64Host
 {-# INLINE putWord64host #-}
 
 

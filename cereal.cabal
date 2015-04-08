@@ -30,7 +30,7 @@ flag split-base
         default: True
 
 library
-        build-depends:          bytestring
+        build-depends:          bytestring >= 0.10.0.0
         if flag(split-base)
                 build-depends:  base == 4.*, containers, array
         else
@@ -45,7 +45,6 @@ library
         exposed-modules:        Data.Serialize,
                                 Data.Serialize.Put,
                                 Data.Serialize.Get,
-                                Data.Serialize.Builder,
                                 Data.Serialize.IEEE754
 
         extensions:             CPP,
