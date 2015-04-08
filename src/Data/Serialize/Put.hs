@@ -73,7 +73,7 @@ import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Builder.Extra as B
 #elif MIN_VERSION_bytestring(0,10,0)
 import qualified Data.ByteString.Lazy.Builder as B
-import qualified Data.ByteString.Lazy.Builder.Extra as B
+import qualified Data.ByteString.Lazy.Builder.Extras as B
 #else
 #error "cereal requires bytestring >= 0.10.0.0"
 #endif
