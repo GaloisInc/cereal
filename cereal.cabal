@@ -12,6 +12,7 @@ stability:              provisional
 build-type:             Simple
 cabal-version:          >= 1.6
 synopsis:               A binary serialization library
+homepage:               https://github.com/GaloisInc/cereal
 extra-source-files:     tests/Benchmark.hs,
                         tests/CBenchmark.c,
                         tests/CBenchmark.h,
