@@ -26,19 +26,10 @@ source-repository head
   type:     git
   location: git://github.com/GaloisInc/cereal.git
 
-flag split-base
-        default: True
-
 library
-        build-depends:          bytestring >= 0.10.0.0
-        if flag(split-base)
-                build-depends:  base == 4.*, containers, array
-        else
-                build-depends:  base < 3.0
-
-        if impl(ghc >= 7.2.1)
-                cpp-options:    -DGENERICS
-                build-depends:  ghc-prim >= 0.2
+        build-depends:          bytestring >= 0.10.0.0,
+                                base == 4.*, containers, array,
+                                ghc-prim >= 0.2
 
         hs-source-dirs:         src
 
