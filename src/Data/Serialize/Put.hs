@@ -11,6 +11,7 @@
 -- The Put monad. A monad for efficiently constructing bytestrings.
 --
 -----------------------------------------------------------------------------
+{-# LANGUAGE CPP #-}
 
 module Data.Serialize.Put (
 
@@ -66,8 +67,16 @@ module Data.Serialize.Put (
   ) where
 
 import Data.ByteString.Builder (Builder, toLazyByteString)
+
+#if MIN_VERSION_bytestring(0,10,2)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Builder.Extra as B
+#elif MIN_VERSION_bytestring(0,10,0)
+import qualified Data.ByteString.Lazy.Builder as B
+import qualified Data.ByteString.Lazy.Builder.Extra as B
+#else
+#error "cereal requires bytestring >= 0.10.0.0"
+#endif
 
 import Control.Applicative
 import Data.Array.Unboxed
