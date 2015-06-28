@@ -97,6 +97,7 @@ import Data.Ix (Ix)
 import Data.List (intercalate)
 import Data.Maybe (isNothing,fromMaybe)
 import Foreign
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Internal as B
@@ -473,7 +474,7 @@ getPtr :: Storable a => Int -> Get a
 getPtr n = do
     (fp,o,_) <- B.toForeignPtr `fmap` getBytes n
     let k p = peek (castPtr (p `plusPtr` o))
-    return (B.inlinePerformIO (withForeignPtr fp k))
+    return (unsafeDupablePerformIO (withForeignPtr fp k))
 {-# INLINE getPtr #-}
 
 ------------------------------------------------------------------------
