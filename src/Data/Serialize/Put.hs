@@ -79,10 +79,10 @@ import qualified Data.ByteString.Lazy.Builder.Extras as B
 #error "cereal requires bytestring >= 0.10.0.0"
 #endif
 
-import Control.Applicative
+import qualified Control.Applicative as A
 import Data.Array.Unboxed
-import Data.Monoid
-import Data.Foldable (foldMap)
+import qualified Data.Monoid as M
+import qualified Data.Foldable as F
 import Data.Word
 import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
@@ -115,35 +115,35 @@ instance Functor PutM where
         {-# INLINE fmap #-}
 
 
-instance Applicative PutM where
+instance A.Applicative PutM where
         pure    = return
         {-# INLINE pure #-}
 
         m <*> k = Put $
             let PairS f w  = unPut m
                 PairS x w' = unPut k
-            in PairS (f x) (w `mappend` w')
+            in PairS (f x) (w `M.mappend` w')
         {-# INLINE (<*>) #-}
 
 
 instance Monad PutM where
-    return a = Put (PairS a mempty)
+    return a = Put (PairS a M.mempty)
     {-# INLINE return #-}
 
     m >>= k  = Put $
         let PairS a w  = unPut m
             PairS b w' = unPut (k a)
-        in PairS b (w `mappend` w')
+        in PairS b (w `M.mappend` w')
     {-# INLINE (>>=) #-}
 
     m >> k  = Put $
         let PairS _ w  = unPut m
             PairS b w' = unPut k
-        in PairS b (w `mappend` w')
+        in PairS b (w `M.mappend` w')
     {-# INLINE (>>) #-}
 
 tell :: Putter Builder
-tell b = Put $ PairS () b
+tell b = Put $! PairS () b
 {-# INLINE tell #-}
 
 putBuilder :: Putter Builder
@@ -266,8 +266,8 @@ putWord64host       = tell . B.word64Host
 
 encodeListOf :: (a -> Builder) -> [a] -> Builder
 encodeListOf f = -- allow inlining with just a single argument
-    \xs ->  execPut (putWord64be (fromIntegral $ length xs)) `mappend`
-            foldMap f xs
+    \xs ->  execPut (putWord64be (fromIntegral $ length xs)) `M.mappend`
+            F.foldMap f xs
 {-# INLINE encodeListOf #-}
 
 putTwoOf :: Putter a -> Putter b -> Putter (a,b)
@@ -275,7 +275,9 @@ putTwoOf pa pb (a,b) = pa a >> pb b
 {-# INLINE putTwoOf #-}
 
 putListOf :: Putter a -> Putter [a]
-putListOf pa = tell . encodeListOf (execPut . pa)
+putListOf pa = \l -> do
+  putWord64be (fromIntegral (length l))
+  mapM_ pa l
 {-# INLINE putListOf #-}
 
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
@@ -287,14 +289,14 @@ putIArrayOf pix pe a = do
 putSeqOf :: Putter a -> Putter (Seq.Seq a)
 putSeqOf pa = \s -> do
     putWord64be (fromIntegral $ Seq.length s) 
-    tell (foldMap (execPut . pa) s)
+    F.mapM_ pa s
 {-# INLINE putSeqOf #-}
 
 putTreeOf :: Putter a -> Putter (T.Tree a)
 putTreeOf pa = 
     tell . go
   where
-    go (T.Node x cs) = execPut (pa x) `mappend` encodeListOf go cs
+    go (T.Node x cs) = execPut (pa x) `M.mappend` encodeListOf go cs
 {-# INLINE putTreeOf #-}
 
 putMapOf :: Ord k => Putter k -> Putter a -> Putter (Map.Map k a)
