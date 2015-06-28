@@ -90,8 +90,9 @@ module Data.Serialize.Get (
 
   ) where
 
-import Control.Applicative (Applicative(..),Alternative(..))
-import Control.Monad (unless,when,ap,MonadPlus(..),liftM2)
+import qualified Control.Applicative as A
+import qualified Control.Monad as M
+import Control.Monad (unless)
 import Data.Array.IArray (IArray,listArray)
 import Data.Ix (Ix)
 import Data.List (intercalate)
@@ -149,7 +150,7 @@ type Input  = B.ByteString
 type Buffer = Maybe B.ByteString
 
 append :: Buffer -> Buffer -> Buffer
-append l r = B.append `fmap` l <*> r
+append l r = B.append `fmap` l A.<*> r
 {-# INLINE append #-}
 
 bufferBytes :: Buffer -> B.ByteString
@@ -176,13 +177,13 @@ instance Functor Get where
         let ks' s1 b1 m1 a = ks s1 b1 m1 (p a)
          in unGet m s0 b0 m0 kf ks'
 
-instance Applicative Get where
+instance A.Applicative Get where
     pure  = return
-    (<*>) = ap
+    (<*>) = M.ap
 
-instance Alternative Get where
+instance A.Alternative Get where
     empty = failDesc "empty"
-    (<|>) = mplus
+    (<|>) = M.mplus
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
@@ -195,7 +196,7 @@ instance Monad Get where
 
     fail     = failDesc
 
-instance MonadPlus Get where
+instance M.MonadPlus Get where
     mzero     = failDesc "mzero"
     mplus a b =
       Get $ \s0 b0 m0 kf ks ->
@@ -337,7 +338,7 @@ ensureRec n = Get $ \s0 b0 m0 kf ks ->
 --   is required to consume all the bytes that it is isolated to.
 isolate :: Int -> Get a -> Get a
 isolate n m = do
-  when (n < 0) (fail "Attempted to isolate a negative number of bytes")
+  M.when (n < 0) (fail "Attempted to isolate a negative number of bytes")
   s <- ensure n
   let (s',rest) = B.splitAt n s
   put s'
@@ -393,7 +394,7 @@ lookAheadM :: Get (Maybe a) -> Get (Maybe a)
 lookAheadM gma = do
     s <- get
     ma <- gma
-    when (isNothing ma) (put s)
+    M.when (isNothing ma) (put s)
     return ma
 
 -- | Like 'lookAhead', but consume the input if @gea@ returns 'Right _'.
@@ -598,7 +599,7 @@ shiftl_w64 = shiftL
 -- Containers ------------------------------------------------------------------
 
 getTwoOf :: Get a -> Get b -> Get (a,b)
-getTwoOf ma mb = liftM2 (,) ma mb
+getTwoOf ma mb = M.liftM2 (,) ma mb
 
 -- | Get a list in the following format:
 --   Word64 (big endian format)
@@ -620,7 +621,7 @@ getListOf m = go [] =<< getWord64be
 --   ...
 --   element n
 getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
-getIArrayOf ix e = liftM2 listArray (getTwoOf ix ix) (getListOf e)
+getIArrayOf ix e = M.liftM2 listArray (getTwoOf ix ix) (getListOf e)
 
 -- | Get a sequence in the following format:
 --   Word64 (big endian format)
@@ -637,7 +638,7 @@ getSeqOf m = go Seq.empty =<< getWord64be
 
 -- | Read as a list of lists.
 getTreeOf :: Get a -> Get (T.Tree a)
-getTreeOf m = liftM2 T.Node m (getListOf (getTreeOf m))
+getTreeOf m = M.liftM2 T.Node m (getListOf (getTreeOf m))
 
 -- | Read as a list of pairs of key and element.
 getMapOf :: Ord k => Get k -> Get a -> Get (Map.Map k a)
