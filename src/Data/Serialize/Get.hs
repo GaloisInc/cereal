@@ -29,8 +29,11 @@ module Data.Serialize.Get (
     , runGetLazy
     , runGetState
     , runGetLazyState
+
+    -- ** Incremental interface
     , Result(..)
     , runGetPartial
+    , runGetChunk
 
     -- * Parsing
     , ensure
@@ -87,13 +90,15 @@ module Data.Serialize.Get (
 
   ) where
 
-import Control.Applicative (Applicative(..),Alternative(..))
-import Control.Monad (unless,when,MonadPlus(..),liftM2)
+import qualified Control.Applicative as A
+import qualified Control.Monad as M
+import Control.Monad (unless)
 import Data.Array.IArray (IArray,listArray)
 import Data.Ix (Ix)
 import Data.List (intercalate)
 import Data.Maybe (isNothing,fromMaybe)
 import Foreign
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Internal as B
@@ -145,7 +150,7 @@ type Input  = B.ByteString
 type Buffer = Maybe B.ByteString
 
 append :: Buffer -> Buffer -> Buffer
-append l r = B.append `fmap` l <*> r
+append l r = B.append `fmap` l A.<*> r
 {-# INLINE append #-}
 
 bufferBytes :: Buffer -> B.ByteString
@@ -170,7 +175,7 @@ instance Functor Get where
     fmap p m =        Get $ \ s0 b0 m0 kf ks ->
       unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> ks s1 b1 m1 (p a)
 
-instance Applicative Get where
+instance A.Applicative Get where
     pure  = return
     {-# INLINE pure #-}
 
@@ -179,11 +184,11 @@ instance Applicative Get where
       unGet x s1 b1 m1 kf $ \ s2 b2 m2 y     -> ks s2 b2 m2 (g y)
     {-# INLINE (<*>) #-}
 
-instance Alternative Get where
+instance A.Alternative Get where
     empty = failDesc "empty"
     {-# INLINE empty #-}
 
-    (<|>) = mplus
+    (<|>) = M.mplus
     {-# INLINE (<|>) #-}
 
 -- Definition directly from Control.Monad.State.Strict
@@ -203,7 +208,7 @@ instance Monad Get where
     {-# INLINE fail #-}
 
 
-instance MonadPlus Get where
+instance M.MonadPlus Get where
     mzero     = failDesc "mzero"
     {-# INLINE mzero #-}
 
@@ -251,10 +256,17 @@ runGet m str =
     Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
 
+-- | Run the get monad on a single chunk, providing an optional length for the
+-- remaining, unseen input, with Nothing indicating that it's not clear how much
+-- input is left.  For example, with a lazy ByteString, the optional length
+-- represents the sum of the lengths of all remaining chunks.
+runGetChunk :: Get a -> Maybe Int -> B.ByteString -> Result a
+runGetChunk m mbLen str = unGet m str Nothing (Incomplete mbLen) failK finalK
+{-# INLINE runGetChunk #-}
+
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGetPartial :: Get a -> B.ByteString -> Result a
-runGetPartial m str =
-  unGet m str Nothing (Incomplete Nothing) failK finalK
+runGetPartial m = runGetChunk m Nothing
 {-# INLINE runGetPartial #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
@@ -284,8 +296,15 @@ runGetState' m str off =
 -- Lazy Get --------------------------------------------------------------------
 
 runGetLazy' :: Get a -> L.ByteString -> (Either String a,L.ByteString)
-runGetLazy' m lstr = loop (Partial (runGetPartial m)) (L.toChunks lstr)
+runGetLazy' m lstr =
+  case L.toChunks lstr of
+    [c]  -> wrapStrict (runGetState' m c       0)
+    []   -> wrapStrict (runGetState' m B.empty 0)
+    c:cs -> loop (runGetChunk m (Just (len - B.length c)) c) cs
   where
+  len = fromIntegral (L.length lstr)
+
+  wrapStrict (e,s) = (e,L.fromChunks [s])
 
   loop result chunks = case result of
 
@@ -335,7 +354,7 @@ ensureRec n = Get $ \s0 b0 m0 kf ks ->
 --   is required to consume all the bytes that it is isolated to.
 isolate :: Int -> Get a -> Get a
 isolate n m = do
-  when (n < 0) (fail "Attempted to isolate a negative number of bytes")
+  M.when (n < 0) (fail "Attempted to isolate a negative number of bytes")
   s <- ensure n
   let (s',rest) = B.splitAt n s
   put s'
@@ -354,10 +373,12 @@ demandInput = Get $ \s0 b0 m0 kf ks ->
     Incomplete mb -> Partial $ \s ->
       if B.null s
       then kf s0 b0 m0 ["demandInput"] "too few bytes"
-      else let update l = l - B.length s
-               s1 = s0 `B.append` s
+      else let s1 = s0 `B.append` s
                b1 = b0 `append` Just s
-            in ks s1 b1 (Incomplete (update `fmap` mb)) ()
+               mb' = case mb of
+                       Just l  -> Just $! l - B.length s
+                       Nothing -> Nothing
+            in mb' `seq` ks s1 b1 (Incomplete mb') ()
 
 failDesc :: String -> Get a
 failDesc err = do
@@ -389,7 +410,7 @@ lookAheadM :: Get (Maybe a) -> Get (Maybe a)
 lookAheadM gma = do
     s <- get
     ma <- gma
-    when (isNothing ma) (put s)
+    M.when (isNothing ma) (put s)
     return ma
 
 -- | Like 'lookAhead', but consume the input if @gea@ returns 'Right _'.
@@ -470,72 +491,82 @@ getPtr :: Storable a => Int -> Get a
 getPtr n = do
     (fp,o,_) <- B.toForeignPtr `fmap` getBytes n
     let k p = peek (castPtr (p `plusPtr` o))
-    return (B.inlinePerformIO (withForeignPtr fp k))
+    return (unsafeDupablePerformIO (withForeignPtr fp k))
 {-# INLINE getPtr #-}
 
 ------------------------------------------------------------------------
 
 -- | Read a Word8 from the monad state
 getWord8 :: Get Word8
-getWord8 = getPtr (sizeOf (undefined :: Word8))
+getWord8 = do
+    s <- getBytes 1
+    return (B.unsafeHead s)
 
 -- | Read a Word16 in big endian format
 getWord16be :: Get Word16
 getWord16be = do
     s <- getBytes 2
-    return $! (fromIntegral (s `B.index` 0) `shiftl_w16` 8) .|.
-              (fromIntegral (s `B.index` 1))
+    return $! (fromIntegral (s `B.unsafeIndex` 0) `shiftl_w16` 8) .|.
+              (fromIntegral (s `B.unsafeIndex` 1))
 
 -- | Read a Word16 in little endian format
 getWord16le :: Get Word16
 getWord16le = do
     s <- getBytes 2
-    return $! (fromIntegral (s `B.index` 1) `shiftl_w16` 8) .|.
-              (fromIntegral (s `B.index` 0) )
+    return $! (fromIntegral (s `B.unsafeIndex` 1) `shiftl_w16` 8) .|.
+              (fromIntegral (s `B.unsafeIndex` 0) )
 
 -- | Read a Word32 in big endian format
 getWord32be :: Get Word32
 getWord32be = do
     s <- getBytes 4
-    return $! (fromIntegral (s `B.index` 0) `shiftl_w32` 24) .|.
-              (fromIntegral (s `B.index` 1) `shiftl_w32` 16) .|.
-              (fromIntegral (s `B.index` 2) `shiftl_w32`  8) .|.
-              (fromIntegral (s `B.index` 3) )
+    return $! (fromIntegral (s `B.unsafeIndex` 0) `shiftl_w32` 24) .|.
+              (fromIntegral (s `B.unsafeIndex` 1) `shiftl_w32` 16) .|.
+              (fromIntegral (s `B.unsafeIndex` 2) `shiftl_w32`  8) .|.
+              (fromIntegral (s `B.unsafeIndex` 3) )
 
 -- | Read a Word32 in little endian format
 getWord32le :: Get Word32
 getWord32le = do
     s <- getBytes 4
-    return $! (fromIntegral (s `B.index` 3) `shiftl_w32` 24) .|.
-              (fromIntegral (s `B.index` 2) `shiftl_w32` 16) .|.
-              (fromIntegral (s `B.index` 1) `shiftl_w32`  8) .|.
-              (fromIntegral (s `B.index` 0) )
+    return $! (fromIntegral (s `B.unsafeIndex` 3) `shiftl_w32` 24) .|.
+              (fromIntegral (s `B.unsafeIndex` 2) `shiftl_w32` 16) .|.
+              (fromIntegral (s `B.unsafeIndex` 1) `shiftl_w32`  8) .|.
+              (fromIntegral (s `B.unsafeIndex` 0) )
 
 -- | Read a Word64 in big endian format
 getWord64be :: Get Word64
 getWord64be = do
     s <- getBytes 8
-    return $! (fromIntegral (s `B.index` 0) `shiftl_w64` 56) .|.
-              (fromIntegral (s `B.index` 1) `shiftl_w64` 48) .|.
-              (fromIntegral (s `B.index` 2) `shiftl_w64` 40) .|.
-              (fromIntegral (s `B.index` 3) `shiftl_w64` 32) .|.
-              (fromIntegral (s `B.index` 4) `shiftl_w64` 24) .|.
-              (fromIntegral (s `B.index` 5) `shiftl_w64` 16) .|.
-              (fromIntegral (s `B.index` 6) `shiftl_w64`  8) .|.
-              (fromIntegral (s `B.index` 7) )
+    return $! (fromIntegral (s `B.unsafeIndex` 0) `shiftl_w64` 56) .|.
+              (fromIntegral (s `B.unsafeIndex` 1) `shiftl_w64` 48) .|.
+              (fromIntegral (s `B.unsafeIndex` 2) `shiftl_w64` 40) .|.
+              (fromIntegral (s `B.unsafeIndex` 3) `shiftl_w64` 32) .|.
+              (fromIntegral (s `B.unsafeIndex` 4) `shiftl_w64` 24) .|.
+              (fromIntegral (s `B.unsafeIndex` 5) `shiftl_w64` 16) .|.
+              (fromIntegral (s `B.unsafeIndex` 6) `shiftl_w64`  8) .|.
+              (fromIntegral (s `B.unsafeIndex` 7) )
 
 -- | Read a Word64 in little endian format
 getWord64le :: Get Word64
 getWord64le = do
     s <- getBytes 8
-    return $! (fromIntegral (s `B.index` 7) `shiftl_w64` 56) .|.
-              (fromIntegral (s `B.index` 6) `shiftl_w64` 48) .|.
-              (fromIntegral (s `B.index` 5) `shiftl_w64` 40) .|.
-              (fromIntegral (s `B.index` 4) `shiftl_w64` 32) .|.
-              (fromIntegral (s `B.index` 3) `shiftl_w64` 24) .|.
-              (fromIntegral (s `B.index` 2) `shiftl_w64` 16) .|.
-              (fromIntegral (s `B.index` 1) `shiftl_w64`  8) .|.
-              (fromIntegral (s `B.index` 0) )
+    return $! (fromIntegral (s `B.unsafeIndex` 7) `shiftl_w64` 56) .|.
+              (fromIntegral (s `B.unsafeIndex` 6) `shiftl_w64` 48) .|.
+              (fromIntegral (s `B.unsafeIndex` 5) `shiftl_w64` 40) .|.
+              (fromIntegral (s `B.unsafeIndex` 4) `shiftl_w64` 32) .|.
+              (fromIntegral (s `B.unsafeIndex` 3) `shiftl_w64` 24) .|.
+              (fromIntegral (s `B.unsafeIndex` 2) `shiftl_w64` 16) .|.
+              (fromIntegral (s `B.unsafeIndex` 1) `shiftl_w64`  8) .|.
+              (fromIntegral (s `B.unsafeIndex` 0) )
+
+{-# INLINE getWord8    #-}
+{-# INLINE getWord16be #-}
+{-# INLINE getWord16le #-}
+{-# INLINE getWord32be #-}
+{-# INLINE getWord32le #-}
+{-# INLINE getWord64be #-}
+{-# INLINE getWord64le #-}
 
 ------------------------------------------------------------------------
 -- Host-endian reads
@@ -592,7 +623,7 @@ shiftl_w64 = shiftL
 -- Containers ------------------------------------------------------------------
 
 getTwoOf :: Get a -> Get b -> Get (a,b)
-getTwoOf ma mb = liftM2 (,) ma mb
+getTwoOf ma mb = M.liftM2 (,) ma mb
 
 -- | Get a list in the following format:
 --   Word64 (big endian format)
@@ -602,7 +633,7 @@ getTwoOf ma mb = liftM2 (,) ma mb
 getListOf :: Get a -> Get [a]
 getListOf m = go [] =<< getWord64be
   where
-  go as 0 = return (reverse as)
+  go as 0 = return $! reverse as
   go as i = do x <- m
                x `seq` go (x:as) (i - 1)
 
@@ -614,7 +645,7 @@ getListOf m = go [] =<< getWord64be
 --   ...
 --   element n
 getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
-getIArrayOf ix e = liftM2 listArray (getTwoOf ix ix) (getListOf e)
+getIArrayOf ix e = M.liftM2 listArray (getTwoOf ix ix) (getListOf e)
 
 -- | Get a sequence in the following format:
 --   Word64 (big endian format)
@@ -631,7 +662,7 @@ getSeqOf m = go Seq.empty =<< getWord64be
 
 -- | Read as a list of lists.
 getTreeOf :: Get a -> Get (T.Tree a)
-getTreeOf m = liftM2 T.Node m (getListOf (getTreeOf m))
+getTreeOf m = M.liftM2 T.Node m (getListOf (getTreeOf m))
 
 -- | Read as a list of pairs of key and element.
 getMapOf :: Ord k => Get k -> Get a -> Get (Map.Map k a)
