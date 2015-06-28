@@ -29,8 +29,11 @@ module Data.Serialize.Get (
     , runGetLazy
     , runGetState
     , runGetLazyState
+
+    -- ** Incremental interface
     , Result(..)
     , runGetPartial
+    , runGetChunk
 
     -- * Parsing
     , ensure
@@ -235,10 +238,17 @@ runGet m str =
     Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
 {-# INLINE runGet #-}
 
+-- | Run the get monad on a single chunk, providing an optional length for the
+-- remaining, unseen input, with Nothing indicating that it's not clear how much
+-- input is left.  For example, with a lazy ByteString, the optional length
+-- represents the sum of the lengths of all remaining chunks.
+runGetChunk :: Get a -> Maybe Int -> B.ByteString -> Result a
+runGetChunk m mbLen str = unGet m str Nothing (Incomplete mbLen) failK finalK
+{-# INLINE runGetChunk #-}
+
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGetPartial :: Get a -> B.ByteString -> Result a
-runGetPartial m str =
-  unGet m str Nothing (Incomplete Nothing) failK finalK
+runGetPartial m = runGetChunk m Nothing
 {-# INLINE runGetPartial #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
@@ -268,8 +278,15 @@ runGetState' m str off =
 -- Lazy Get --------------------------------------------------------------------
 
 runGetLazy' :: Get a -> L.ByteString -> (Either String a,L.ByteString)
-runGetLazy' m lstr = loop (Partial (runGetPartial m)) (L.toChunks lstr)
+runGetLazy' m lstr =
+  case L.toChunks lstr of
+    [c]  -> wrapStrict (runGetState' m c       0)
+    []   -> wrapStrict (runGetState' m B.empty 0)
+    c:cs -> loop (runGetChunk m (Just (len - B.length c)) c) cs
   where
+  len = fromIntegral (L.length lstr)
+
+  wrapStrict (e,s) = (e,L.fromChunks [s])
 
   loop result chunks = case result of
 
