@@ -355,10 +355,12 @@ demandInput = Get $ \s0 b0 m0 kf ks ->
     Incomplete mb -> Partial $ \s ->
       if B.null s
       then kf s0 b0 m0 ["demandInput"] "too few bytes"
-      else let update l = l - B.length s
-               s1 = s0 `B.append` s
+      else let s1 = s0 `B.append` s
                b1 = b0 `append` Just s
-            in ks s1 b1 (Incomplete (update `fmap` mb)) ()
+               mb' = case mb of
+                       Just l  -> Just $! l - B.length s
+                       Nothing -> Nothing
+            in mb' `seq` ks s1 b1 (Incomplete mb') ()
 
 failDesc :: String -> Get a
 failDesc err = do
