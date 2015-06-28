@@ -544,6 +544,14 @@ getWord64le = do
               (fromIntegral (s `B.unsafeIndex` 1) `shiftl_w64`  8) .|.
               (fromIntegral (s `B.unsafeIndex` 0) )
 
+{-# INLINE getWord8    #-}
+{-# INLINE getWord16be #-}
+{-# INLINE getWord16le #-}
+{-# INLINE getWord32be #-}
+{-# INLINE getWord32le #-}
+{-# INLINE getWord64be #-}
+{-# INLINE getWord64le #-}
+
 ------------------------------------------------------------------------
 -- Host-endian reads
 
@@ -609,7 +617,7 @@ getTwoOf ma mb = M.liftM2 (,) ma mb
 getListOf :: Get a -> Get [a]
 getListOf m = go [] =<< getWord64be
   where
-  go as 0 = return (reverse as)
+  go as 0 = return $! reverse as
   go as i = do x <- m
                x `seq` go (x:as) (i - 1)
 
