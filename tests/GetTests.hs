@@ -86,6 +86,7 @@ instance Arbitrary Chunks where
 testLength :: Word
 testLength = 255
 
+-- Equality between strict and lazy parsing
 eqStrictLazy :: GetD -> Property
 eqStrictLazy getD =
   conjoin
@@ -98,6 +99,7 @@ eqStrictLazy getD =
   where
     parser = buildGet getD
 
+-- Remaining length equality between strict and lazy parsing
 remainingStrictLazy :: GetD -> Property
 remainingStrictLazy getD =
   conjoin
@@ -137,12 +139,14 @@ p1 ==! p2 =
 
 infix 2 ==~, ==!
 
+-- Equality between two eof definition - lazy
 eqEof :: GetD -> Property
 eqEof getD =
     x *> isEmpty ==~ x *> isEmpty2
   where
     x = buildGet getD
 
+-- Equality between two eof definition - strict
 eqEof' :: GetD -> Property
 eqEof' getD =
     x *> isEmpty ==! x *> isEmpty2
@@ -256,10 +260,10 @@ main =
   , QC.label "strict - monad right id"         monadIdR'
   , QC.label "lazy   - monad assoc"            monadAssoc
   , QC.label "strict - monad assoc"            monadAssoc'
-  , QC.label "strict lazy - iso"               eqStrictLazy
-  , QC.label "strict lazy - remaining iso"     remainingStrictLazy
+  , QC.label "strict lazy - equality"               eqStrictLazy
+  , QC.label "strict lazy - remaining equality"     remainingStrictLazy
   , QC.label "lazy   - two eof"                eqEof
-  , QC.label "strict - two eof "               eqEof'
+  , QC.label "strict - two eof"                eqEof'
   , QC.label "lazy   - alternative left Id"    alterIdL
   , QC.label "strict - alternative left Id"    alterIdL'
   , QC.label "lazy   - alternative right Id"   alterIdR
