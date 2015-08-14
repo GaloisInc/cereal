@@ -10,6 +10,10 @@
            , ScopedTypeVariables #-}
 #endif
 
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(x,y,z) 1
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Serialize
@@ -66,6 +70,10 @@ import qualified Data.Sequence        as Seq
 #ifdef GENERICS
 import GHC.Generics
 import Control.Applicative ((*>),(<*>),(<$>),pure)
+#endif
+
+#if MIN_VERSION_base(4,8,0)
+import Numeric.Natural
 #endif
 
 ------------------------------------------------------------------------
@@ -238,13 +246,13 @@ instance Serialize Integer where
 --
 -- Fold and unfold an Integer to and from a list of its bytes
 --
-unroll :: Integer -> [Word8]
+unroll :: (Integral a, Num a, Bits a) => a -> [Word8]
 unroll = unfoldr step
   where
     step 0 = Nothing
     step i = Just (fromIntegral i, i `shiftR` 8)
 
-roll :: [Word8] -> Integer
+roll :: (Integral a, Num a, Bits a) => [Word8] -> a
 roll   = foldr unstep 0
   where
     unstep b a = a `shiftL` 8 .|. fromIntegral b
@@ -252,6 +260,31 @@ roll   = foldr unstep 0
 instance (Serialize a,Integral a) => Serialize (R.Ratio a) where
     put r = put (R.numerator r) >> put (R.denominator r)
     get = liftM2 (R.%) get get
+
+#if MIN_VERSION_base(4,8,0)
+-- Fixed-size type for a subset of Natural
+type NaturalWord = Word64
+
+instance Serialize Natural where
+    {-# INLINE put #-}
+    put n | n <= hi = do
+        putWord8 0
+        put (fromIntegral n :: NaturalWord)  -- fast path
+     where
+        hi = fromIntegral (maxBound :: NaturalWord) :: Natural
+
+    put n = do
+        putWord8 1
+        put (unroll (abs n))         -- unroll the bytes
+
+    {-# INLINE get #-}
+    get = do
+        tag <- get :: Get Word8
+        case tag of
+            0 -> liftM fromIntegral (get :: Get NaturalWord)
+            _ -> do bytes <- get
+                    return $! roll bytes
+#endif
 
 ------------------------------------------------------------------------
 
