@@ -494,12 +494,12 @@ instance (Serialize e) => Serialize (Seq.Seq e) where
 -- Floating point
 
 instance Serialize Double where
-    put d = put (decodeFloat d)
-    get   = liftM2 encodeFloat get get
+    put = putFloat64be
+    get = getFloat64be
 
 instance Serialize Float where
-    put f = put (decodeFloat f)
-    get   = liftM2 encodeFloat get get
+    put = putFloat32be
+    get = getFloat32be
 
 ------------------------------------------------------------------------
 -- Trees
