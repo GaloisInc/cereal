@@ -1,6 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE CPP #-}
 
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(x,y,z) 1
+#endif
+
+#ifndef MIN_VERSION_array
+#define MIN_VERSION_array(x,y,z) 1
+#endif
+
 -- | IEEE-754 parsing, as described in this stack-overflow article:
 --
 -- <http://stackoverflow.com/questions/6976684/converting-ieee-754-floating-point-in-haskell-word32-64-to-and-from-haskell-float/7002812#7002812>
@@ -21,7 +29,6 @@ module Data.Serialize.IEEE754 (
 
 ) where
 
-import Control.Applicative ( (<$>) )
 import Control.Monad.ST ( runST, ST )
 
 import Data.Array.ST ( newArray, readArray, MArray, STUArray )
@@ -29,7 +36,11 @@ import Data.Word ( Word32, Word64 )
 import Data.Serialize.Get
 import Data.Serialize.Put
 
-#if __GLASGOW_HASKELL__ >= 704
+#if !(MIN_VERSION_base(4,8,0))
+import Control.Applicative ( (<$>) )
+#endif
+
+#if MIN_VERSION_array(0,4,0)
 import Data.Array.Unsafe (castSTUArray)
 #else
 import Data.Array.ST (castSTUArray)

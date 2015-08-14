@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(x,y,z) 0
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Serialize.Put
@@ -68,10 +74,7 @@ module Data.Serialize.Put (
 import Data.Serialize.Builder (Builder, toByteString, toLazyByteString)
 import qualified Data.Serialize.Builder as B
 
-import Control.Applicative
 import Data.Array.Unboxed
-import Data.Monoid
-import Data.Foldable (foldMap)
 import Data.Word
 import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
@@ -82,6 +85,11 @@ import qualified Data.Sequence          as Seq
 import qualified Data.Set               as Set
 import qualified Data.Tree              as T
 
+#if !(MIN_VERSION_base(4,8,0))
+import Control.Applicative
+import Data.Foldable (foldMap)
+import Data.Monoid
+#endif
 
 ------------------------------------------------------------------------
 
