@@ -7,7 +7,7 @@
 -- Module      : Data.Serialize.Builder
 -- Copyright   : Lennart Kolmodin, Ross Paterson, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
--- 
+--
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   :
 -- Portability :
