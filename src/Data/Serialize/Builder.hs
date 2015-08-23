@@ -7,7 +7,7 @@
 -- Module      : Data.Serialize.Builder
 -- Copyright   : Lennart Kolmodin, Ross Paterson, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
--- 
+--
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   :
 -- Portability :
@@ -18,6 +18,14 @@
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 #include "MachDeps.h"
+#endif
+
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(x,y,z) 0
+#endif
+
+#ifndef MIN_VERSION_bytestring
+#define MIN_VERSION_bytestring(x,y,z) 0
 #endif
 
 module Data.Serialize.Builder (
@@ -56,7 +64,6 @@ module Data.Serialize.Builder (
 
   ) where
 
-import Data.Monoid
 import Data.Word
 import Foreign.ForeignPtr
 import Foreign.Ptr (Ptr,plusPtr)
@@ -65,6 +72,10 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString          as S
 import qualified Data.ByteString.Lazy     as L
 import qualified Data.ByteString.Internal as S
+
+#if !(MIN_VERSION_base(4,8,0))
+import Data.Monoid
+#endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base (Int(..), uncheckedShiftRL#)
@@ -194,7 +205,11 @@ defaultSize = 32 * k - overhead
 
 -- | Sequence an IO operation on the buffer
 unsafeLiftIO :: (Buffer -> IO Buffer) -> Builder
+#if !(MIN_VERSION_bytestring(0,10,6))
 unsafeLiftIO f =  Builder $ \ k buf -> S.inlinePerformIO $ do
+#else
+unsafeLiftIO f =  Builder $ \ k buf -> S.accursedUnutterablePerformIO $ do
+#endif
     buf' <- f buf
     return (k buf')
 {-# INLINE unsafeLiftIO #-}
