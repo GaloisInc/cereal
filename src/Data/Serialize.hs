@@ -65,11 +65,13 @@ import qualified Data.Ratio           as R
 import qualified Data.Tree            as T
 import qualified Data.Sequence        as Seq
 
+#ifdef GENERICS
 import GHC.Generics
 #endif
 
 #if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative ((*>),(<*>),(<$>),pure)
+#endif
 
 #if MIN_VERSION_base(4,8,0)
 import Numeric.Natural
@@ -91,11 +93,13 @@ class Serialize t where
     -- | Decode a value in the Get monad
     get :: Get t
 
+#ifdef GENERICS
     default put :: (Generic t, GSerialize (Rep t)) => Putter t
     put = gPut . from
 
     default get :: (Generic t, GSerialize (Rep t)) => Get t
     get = to <$> gGet
+#endif
 
 ------------------------------------------------------------------------
 -- Wrappers to run the underlying monad
@@ -517,6 +521,7 @@ instance (Serialize i, Ix i, Serialize e, IArray UArray e)
     put = putIArrayOf put put
     get = getIArrayOf get get
 
+#ifdef GENERICS
 ------------------------------------------------------------------------
 -- Generic Serialze
 
@@ -639,3 +644,4 @@ instance (SumSize a, SumSize b) => SumSize (a :+: b) where
 
 instance SumSize (C1 c a) where
     sumSize = Tagged 1
+#endif
