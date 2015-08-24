@@ -1,5 +1,5 @@
 name:                   cereal
-version:                0.4.1.1
+version:                0.5.0.0
 license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
@@ -12,6 +12,7 @@ stability:              provisional
 build-type:             Simple
 cabal-version:          >= 1.6
 synopsis:               A binary serialization library
+homepage:               https://github.com/GaloisInc/cereal
 extra-source-files:     tests/Benchmark.hs,
                         tests/CBenchmark.c,
                         tests/CBenchmark.h,
@@ -26,19 +27,10 @@ source-repository head
   type:     git
   location: git://github.com/GaloisInc/cereal.git
 
-flag split-base
-        default: True
-
 library
-        build-depends:          bytestring
-        if flag(split-base)
-                build-depends:  base == 4.*, containers, array
-        else
-                build-depends:  base < 3.0
-
-        if impl(ghc >= 7.2.1)
-                cpp-options:    -DGENERICS
-                build-depends:  ghc-prim >= 0.2
+        build-depends:          bytestring >= 0.10.0.0,
+                                base == 4.*, containers, array,
+                                ghc-prim >= 0.2
 
         hs-source-dirs:         src
 
