@@ -392,8 +392,10 @@ uncheckedSkip n = do
 -- Fails if @ga@ fails.
 lookAhead :: Get a -> Get a
 lookAhead ga = Get $ \ s0 b0 m0 kf ks ->
-  let ks' _s1 b1 = ks (s0 `B.append` bufferBytes b1) (b0 `append` b1)
-   in unGet ga s0 (Just B.empty) m0 kf ks'
+  -- the new continuation extends the old input with the new buffered bytes, and
+  -- the new buffer replaces the old one.
+  let ks' _s1 b1 = ks (s0 `B.append` bufferBytes b1) b1
+   in unGet ga s0 b0 m0 kf ks'
 
 -- | Like 'lookAhead', but consume the input if @gma@ returns 'Just _'.
 -- Fails if @gma@ fails.
