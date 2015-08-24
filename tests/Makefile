@@ -1,6 +1,6 @@
 GHC	= ghc -O2 -fforce-recomp -i../src
 
-all: bench qc
+all: bench qc qcGet
 
 bench:: Benchmark.hs MemBench.hs CBenchmark.o
 	$(GHC) -fliberate-case-threshold=1000 --make Benchmark.hs CBenchmark.o -o $@
@@ -17,7 +17,11 @@ qc: Tests.hs
 	$(GHC) --make $< -o $@
 	./$@
 
+qcGet: GetTests.hs
+	$(GHC) --make $< -o $@
+	./$@
+
 clean:
-	$(RM) *.o *.hi bench qc
+	$(RM) *.o *.hi bench qc qcGet
 
 .PHONY: clean bench bench-nb
