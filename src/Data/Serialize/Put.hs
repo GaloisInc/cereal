@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(x,y,z) 0
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Serialize.Put
@@ -93,6 +99,11 @@ import qualified Data.Sequence          as Seq
 import qualified Data.Set               as Set
 import qualified Data.Tree              as T
 
+#if !(MIN_VERSION_base(4,8,0))
+import Control.Applicative
+import Data.Foldable (foldMap)
+import Data.Monoid
+#endif
 
 ------------------------------------------------------------------------
 
