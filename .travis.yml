@@ -1,6 +1,7 @@
 # NB: don't set `language: haskell` here
 
 # See also https://github.com/hvr/multi-ghc-travis for more information
+sudo: false
 
 # The following lines enable several GHC versions and/or HP versions
 # to be tested; often it's enough to test only against the last
@@ -18,12 +19,21 @@ env:
  - CABALVER=1.22 GHCVER=7.10.3
 # - CABALVER=head GHCVER=head
 
+addons:
+  apt:
+    sources:
+     - ppa:hvr/ghc
+
+    packages:
+     - cabal-install-$CABALVER
+     - ghc-$GHCVER
+
 # Note: the distinction between `before_install` and `install` is not
 #       important.
 before_install:
- - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
- - travis_retry sudo apt-get update
- - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
+ # - travis_retry add-apt-repository -y ppa:hvr/ghc
+ # - travis_retry apt-get update
+ # - travis_retry apt-get install cabal-install-$CABALVER ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
 
 install:
