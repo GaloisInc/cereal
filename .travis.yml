@@ -1,7 +1,10 @@
 # NB: don't set `language: haskell` here
 
-# See also https://github.com/hvr/multi-ghc-travis for more information
 sudo: false
+
+cache:
+  directories:
+    - $HOME/.cabal/packages
 
 matrix:
   include:
