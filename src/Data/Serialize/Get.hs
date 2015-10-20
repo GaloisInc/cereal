@@ -165,6 +165,15 @@ newtype Get a = Get
 type Input  = B.ByteString
 type Buffer = Maybe B.ByteString
 
+emptyBuffer :: Buffer
+emptyBuffer  = Just B.empty
+
+extendBuffer :: Buffer -> B.ByteString -> Buffer
+extendBuffer buf chunk =
+  do bs <- buf
+     return (bs `B.append` chunk)
+{-# INLINE extendBuffer #-}
+
 append :: Buffer -> Buffer -> Buffer
 append l r = B.append `fmap` l A.<*> r
 {-# INLINE append #-}
@@ -230,9 +239,12 @@ instance M.MonadPlus Get where
 
     mplus a b =
       Get $ \s0 b0 m0 kf ks ->
-        let kf' _ b1 m1 _ _ = unGet b (s0 `B.append` bufferBytes b1)
-                                      (b0 `append` b1) m1 kf ks
-         in unGet a s0 (Just B.empty) m0 kf' ks
+        let ks' s1 b1        = ks s1 (b0 `append` b1)
+            kf' _  b1 m1     = kf (s0 `B.append` bufferBytes b1)
+                                  (b0 `append` b1) m1
+            try _  b1 m1 _ _ = unGet b (s0 `B.append` bufferBytes b1)
+                                       b1 m1 kf' ks'
+         in unGet a s0 emptyBuffer m0 try ks'
     {-# INLINE mplus #-}
 
 
@@ -390,11 +402,12 @@ demandInput = Get $ \s0 b0 m0 kf ks ->
       if B.null s
       then kf s0 b0 m0 ["demandInput"] "too few bytes"
       else let s1 = s0 `B.append` s
-               b1 = b0 `append` Just s
+               b1 = extendBuffer b0 s
                mb' = case mb of
                        Just l  -> Just $! l - B.length s
                        Nothing -> Nothing
-            in mb' `seq` ks s1 b1 (Incomplete mb') ()
+            in b1  `seq`
+               mb' `seq` ks s1 b1 (Incomplete mb') ()
 
 failDesc :: String -> Get a
 failDesc err = do
@@ -418,9 +431,10 @@ uncheckedSkip n = do
 lookAhead :: Get a -> Get a
 lookAhead ga = Get $ \ s0 b0 m0 kf ks ->
   -- the new continuation extends the old input with the new buffered bytes, and
-  -- the new buffer replaces the old one.
-  let ks' _s1 b1 = ks (s0 `B.append` bufferBytes b1) b1
-   in unGet ga s0 b0 m0 kf ks'
+  -- appends the new buffer to the old one, if there was one.
+  let ks' _ b1 = ks (s0 `B.append` bufferBytes b1) (b0 `append` b1)
+      kf' _ b1 = kf s0 (b0 `append` b1)
+   in unGet ga s0 emptyBuffer m0 kf' ks'
 
 -- | Like 'lookAhead', but consume the input if @gma@ returns 'Just _'.
 -- Fails if @gma@ fails.
