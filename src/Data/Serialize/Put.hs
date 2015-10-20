@@ -17,7 +17,6 @@
 -- The Put monad. A monad for efficiently constructing bytestrings.
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE CPP #-}
 
 module Data.Serialize.Put (
 
@@ -39,6 +38,10 @@ module Data.Serialize.Put (
     , putWord8
     , putByteString
     , putLazyByteString
+
+#if MIN_VERSION_bytestring(0,10,4)
+    , putShortByteString
+#endif
 
     -- * Big-endian primitives
     , putWord16be
@@ -83,6 +86,10 @@ import qualified Data.ByteString.Lazy.Builder as B
 import qualified Data.ByteString.Lazy.Builder.Extras as B
 #else
 #error "cereal requires bytestring >= 0.10.0.0"
+#endif
+
+#if MIN_VERSION_bytestring(0,10,4)
+import qualified Data.ByteString.Short as BS
 #endif
 
 import qualified Control.Applicative as A
@@ -204,6 +211,11 @@ putWord8            = tell . B.word8
 putByteString       :: Putter S.ByteString
 putByteString       = tell . B.byteString
 {-# INLINE putByteString #-}
+
+#if MIN_VERSION_bytestring(0,10,4)
+putShortByteString  :: Putter BS.ShortByteString
+putShortByteString   = tell . B.shortByteString
+#endif
 
 -- | Write a lazy ByteString efficiently, simply appending the lazy
 -- ByteString chunks to the output buffer
