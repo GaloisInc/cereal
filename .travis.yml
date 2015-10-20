@@ -22,7 +22,7 @@ env:
 addons:
   apt:
     sources:
-     - ppa:hvr/ghc
+     - hvr-ghc
 
     packages:
      - cabal-install-$CABALVER
