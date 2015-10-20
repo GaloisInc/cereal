@@ -4,6 +4,10 @@
 #define MIN_VERSION_base(x,y,z) 0
 #endif
 
+#ifndef MIN_VERSION_bytestring
+#define MIN_VERSION_bytestring(x,y,z) 0
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Data.Serialize.Put
