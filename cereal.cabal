@@ -13,12 +13,7 @@ build-type:             Simple
 cabal-version:          >= 1.10
 synopsis:               A binary serialization library
 homepage:               https://github.com/GaloisInc/cereal
-extra-source-files:     tests/Benchmark.hs,
-                        tests/CBenchmark.c,
-                        tests/CBenchmark.h,
-                        tests/Makefile,
-                        tests/MemBench.hs,
-                        tests/Tests.hs
+
 description:
   A binary serialization library, similar to binary, that introduces an isolate
   primitive for parser isolation, and labeled blocks for better error messages.
