@@ -1,14 +1,18 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-import Control.Applicative
-import Control.Monad
-import Data.Word
-import Data.Function
+module GetTests (tests) where
+
+import           Control.Applicative
+import           Control.Monad
+import           Data.Word
+import           Data.Function
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LB
-import Data.Serialize.Get
-import Test.QuickCheck as QC
+import           Data.Serialize.Get
+import           Test.Framework (Test(),testGroup)
+import           Test.Framework.Providers.QuickCheck2 (testProperty)
+import           Test.QuickCheck as QC
 
 
 -- Data to express Get parser to generate
@@ -251,25 +255,24 @@ alterDistr' p1 p2 p3 =
     z = buildGet p3
 
 
-main :: IO ()
-main =
-  mapM_ quickCheck
-  [ QC.label "lazy   - monad left id"          monadIdL
-  , QC.label "strict - monad left id"          monadIdL'
-  , QC.label "lazy   - monad right id"         monadIdR
-  , QC.label "strict - monad right id"         monadIdR'
-  , QC.label "lazy   - monad assoc"            monadAssoc
-  , QC.label "strict - monad assoc"            monadAssoc'
-  , QC.label "strict lazy - equality"               eqStrictLazy
-  , QC.label "strict lazy - remaining equality"     remainingStrictLazy
-  , QC.label "lazy   - two eof"                eqEof
-  , QC.label "strict - two eof"                eqEof'
-  , QC.label "lazy   - alternative left Id"    alterIdL
-  , QC.label "strict - alternative left Id"    alterIdL'
-  , QC.label "lazy   - alternative right Id"   alterIdR
-  , QC.label "strict - alternative right Id"   alterIdR'
-  , QC.label "lazy   - alternative assoc"      alterAssoc
-  , QC.label "strict - alternative assoc"      alterAssoc'
-  , QC.label "lazy   - alternative distr"      alterDistr
-  , QC.label "strict - alternative distr"      alterDistr'
+tests :: Test
+tests  = testGroup "GetTests"
+  [ testProperty "lazy   - monad left id"          monadIdL
+  , testProperty "strict - monad left id"          monadIdL'
+  , testProperty "lazy   - monad right id"         monadIdR
+  , testProperty "strict - monad right id"         monadIdR'
+  , testProperty "lazy   - monad assoc"            monadAssoc
+  , testProperty "strict - monad assoc"            monadAssoc'
+  , testProperty "strict lazy - equality"          eqStrictLazy
+  , testProperty "strict lazy - remaining equality"remainingStrictLazy
+  , testProperty "lazy   - two eof"                eqEof
+  , testProperty "strict - two eof"                eqEof'
+  , testProperty "lazy   - alternative left Id"    alterIdL
+  , testProperty "strict - alternative left Id"    alterIdL'
+  , testProperty "lazy   - alternative right Id"   alterIdR
+  , testProperty "strict - alternative right Id"   alterIdR'
+  , testProperty "lazy   - alternative assoc"      alterAssoc
+  , testProperty "strict - alternative assoc"      alterAssoc'
+  , testProperty "lazy   - alternative distr"      alterDistr
+  , testProperty "strict - alternative distr"      alterDistr'
   ]

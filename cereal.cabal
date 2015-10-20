@@ -10,7 +10,7 @@ maintainer:             Trevor Elliott <trevor@galois.com>
 category:               Data, Parsing
 stability:              provisional
 build-type:             Simple
-cabal-version:          >= 1.6
+cabal-version:          >= 1.10
 synopsis:               A binary serialization library
 homepage:               https://github.com/GaloisInc/cereal
 extra-source-files:     tests/Benchmark.hs,
@@ -28,6 +28,8 @@ source-repository head
   location: git://github.com/GaloisInc/cereal.git
 
 library
+        default-language:       Haskell2010
+
         build-depends:          bytestring >= 0.10.0.0,
                                 base == 4.*, containers, array,
                                 ghc-prim >= 0.2
@@ -39,11 +41,24 @@ library
                                 Data.Serialize.Get,
                                 Data.Serialize.IEEE754
 
-        extensions:             CPP,
-                                FlexibleContexts,
-                                FlexibleInstances,
-                                Rank2Types,
-                                MagicHash
-
         ghc-options:            -Wall -O2 -funbox-strict-fields
         ghc-prof-options:       -prof -auto-all
+
+
+test-suite test-cereal
+        default-language:       Haskell2010
+
+        type:                   exitcode-stdio-1.0
+
+        build-depends:          base == 4.*,
+                                bytestring,
+                                QuickCheck,
+                                test-framework,
+                                test-framework-quickcheck2,
+                                cereal
+
+        main-is:                Main.hs
+        other-modules:          RoundTrip
+                                GetTests
+
+        hs-source-dirs:         tests
