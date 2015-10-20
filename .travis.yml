@@ -3,30 +3,23 @@
 # See also https://github.com/hvr/multi-ghc-travis for more information
 sudo: false
 
-# The following lines enable several GHC versions and/or HP versions
-# to be tested; often it's enough to test only against the last
-# release of a major GHC version. Setting HPVER implictly sets
-# GHCVER. Omit lines with versions you don't need/want testing for.
-env:
- - CABALVER=1.16 GHCVER=7.6.1
- - CABALVER=1.16 GHCVER=7.6.2
- - CABALVER=1.18 GHCVER=7.6.3
- - CABALVER=1.18 GHCVER=7.8.1
- - CABALVER=1.18 GHCVER=7.8.2
- - CABALVER=1.18 GHCVER=7.8.3
- - CABALVER=1.22 GHCVER=7.10.1
- - CABALVER=1.22 GHCVER=7.10.2
- - CABALVER=1.22 GHCVER=7.10.3
-# - CABALVER=head GHCVER=head
-
-addons:
-  apt:
-    sources:
-     - hvr-ghc
-
-    packages:
-     - cabal-install-$CABALVER
-     - ghc-$GHCVER
+matrix:
+  include:
+    - env: CABALVER=1.16 GHCVER=7.6.3
+      compiler: ": #GHC 7.6.3"
+      addons: {apt: {packages: [cabal-install-1.16,ghc-7.6.3], sources: [hvr-ghc]}}
+    - env: CABALVER=1.18 GHCVER=7.8.4
+      compiler: ": #GHC 7.8.4"
+      addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4], sources: [hvr-ghc]}}
+    - env: CABALVER=1.22 GHCVER=7.10.1
+      compiler: ": #GHC 7.10.1"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1], sources: [hvr-ghc]}}
+    - env: CABALVER=1.22 GHCVER=7.10.2
+      compiler: ": #GHC 7.10.2"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2], sources: [hvr-ghc]}}
+    - env: CABALVER=1.22 GHCVER=head
+      compiler: ": #GHC head"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-head], sources: [hvr-ghc]}}
 
 # Note: the distinction between `before_install` and `install` is not
 #       important.
