@@ -18,6 +18,8 @@ description:
   A binary serialization library, similar to binary, that introduces an isolate
   primitive for parser isolation, and labeled blocks for better error messages.
 
+extra-source-files:     CHANGELOG.md
+
 source-repository head
   type:     git
   location: git://github.com/GaloisInc/cereal.git
@@ -37,7 +39,6 @@ library
                                 Data.Serialize.IEEE754
 
         ghc-options:            -Wall -O2 -funbox-strict-fields
-        ghc-prof-options:       -prof -auto-all
 
 
 test-suite test-cereal
