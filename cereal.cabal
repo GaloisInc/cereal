@@ -1,5 +1,5 @@
 name:                   cereal
-version:                0.5.0.0
+version:                0.5.1.0
 license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
@@ -39,6 +39,10 @@ library
                                 Data.Serialize.IEEE754
 
         ghc-options:            -Wall -O2 -funbox-strict-fields
+
+        if impl(ghc >= 7.2.1)
+                                cpp-options:    -DGENERICS
+                                build-depends:  ghc-prim >= 0.2
 
 
 test-suite test-cereal
