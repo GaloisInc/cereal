@@ -1,3 +1,7 @@
+0.5.1.0
+=======
+
+* Re-enable GHC.Generics support which was accidentally removed in 0.5.0.0
 
 0.5.0.0
 =======
