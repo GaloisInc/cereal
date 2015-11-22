@@ -201,13 +201,17 @@ instance Functor Get where
       unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> ks s1 b1 m1 (p a)
 
 instance A.Applicative Get where
-    pure  = return
+    pure a = Get $ \ s0 b0 m0 _ ks -> ks s0 b0 m0 a
     {-# INLINE pure #-}
 
     f <*> x =         Get $ \ s0 b0 m0 kf ks ->
       unGet f s0 b0 m0 kf $ \ s1 b1 m1 g     ->
       unGet x s1 b1 m1 kf $ \ s2 b2 m2 y     -> ks s2 b2 m2 (g y)
     {-# INLINE (<*>) #-}
+
+    m *> k =          Get $ \ s0 b0 m0 kf ks ->
+      unGet m s0 b0 m0 kf $ \ s1 b1 m1 _     -> unGet k s1 b1 m1 kf ks
+    {-# INLINE (*>) #-}
 
 instance A.Alternative Get where
     empty = failDesc "empty"
@@ -218,15 +222,14 @@ instance A.Alternative Get where
 
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
-    return a = Get $ \ s0 b0 m0 _ ks -> ks s0 b0 m0 a
+    return = A.pure
     {-# INLINE return #-}
 
     m >>= g  =        Get $ \ s0 b0 m0 kf ks ->
       unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> unGet (g a) s1 b1 m1 kf ks
     {-# INLINE (>>=) #-}
 
-    m >> k =          Get $ \ s0 b0 m0 kf ks ->
-      unGet m s0 b0 m0 kf $ \ s1 b1 m1 _     -> unGet k s1 b1 m1 kf ks
+    (>>) = (A.*>)
     {-# INLINE (>>) #-}
 
     fail     = failDesc
