@@ -1,3 +1,10 @@
+
+Future
+======
+
+* Implement the AMP recommended refactoring for the Functor/Applicative/Monad
+  hierarchy for Get and PutM (thanks to Herbert Valerio Riedel!)
+
 0.5.1.0
 =======
 
