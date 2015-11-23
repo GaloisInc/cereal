@@ -138,7 +138,7 @@ instance Functor PutM where
 
 
 instance A.Applicative PutM where
-        pure    = return
+        pure a = Put (PairS a M.mempty)
         {-# INLINE pure #-}
 
         m <*> k = Put $
@@ -147,9 +147,15 @@ instance A.Applicative PutM where
             in PairS (f x) (w `M.mappend` w')
         {-# INLINE (<*>) #-}
 
+        m *> k  = Put $
+            let PairS _ w  = unPut m
+                PairS b w' = unPut k
+            in PairS b (w `M.mappend` w')
+        {-# INLINE (*>) #-}
+
 
 instance Monad PutM where
-    return a = Put (PairS a M.mempty)
+    return = pure
     {-# INLINE return #-}
 
     m >>= k  = Put $
@@ -158,10 +164,7 @@ instance Monad PutM where
         in PairS b (w `M.mappend` w')
     {-# INLINE (>>=) #-}
 
-    m >> k  = Put $
-        let PairS _ w  = unPut m
-            PairS b w' = unPut k
-        in PairS b (w `M.mappend` w')
+    (>>) = (*>)
     {-# INLINE (>>) #-}
 
 tell :: Putter Builder
