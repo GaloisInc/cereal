@@ -28,7 +28,7 @@ source-repository head
 library
         default-language:       Haskell2010
 
-        build-depends:          bytestring >= 0.10.0.0,
+        build-depends:          bytestring >= 0.10.2.0,
                                 base >= 4.4 && < 5, containers, array,
                                 ghc-prim >= 0.2
 
