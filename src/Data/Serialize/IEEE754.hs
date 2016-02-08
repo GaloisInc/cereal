@@ -30,7 +30,7 @@ import Data.Word ( Word32, Word64 )
 import Data.Serialize.Get
 import Data.Serialize.Put
 import qualified Data.ByteString.Builder as Builder
-import System.IO.Unsafe (unsafePerformIO)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Storable (peek, poke)
 import Foreign.Ptr (castPtr, Ptr)
@@ -71,14 +71,12 @@ putFloat64le = putBuilder . Builder.doubleLE
 putFloat64be :: Double -> Put
 putFloat64be = putBuilder . Builder.doubleBE
 
-{-# NOINLINE wordToFloat #-}
 wordToFloat :: Word32 -> Float
-wordToFloat w = unsafePerformIO $ alloca $ \(ptr :: Ptr Word32) -> do
+wordToFloat w = unsafeDupablePerformIO $ alloca $ \(ptr :: Ptr Word32) -> do
     poke ptr w
     peek (castPtr ptr)
 
-{-# NOINLINE wordToDouble #-}
 wordToDouble :: Word64 -> Double
-wordToDouble w = unsafePerformIO $ alloca $ \(ptr :: Ptr Word64) -> do
+wordToDouble w = unsafeDupablePerformIO $ alloca $ \(ptr :: Ptr Word64) -> do
     poke ptr w
     peek (castPtr ptr)
