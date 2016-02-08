@@ -71,11 +71,13 @@ putFloat64le = putBuilder . Builder.doubleLE
 putFloat64be :: Double -> Put
 putFloat64be = putBuilder . Builder.doubleBE
 
+{-# INLINE wordToFloat #-}
 wordToFloat :: Word32 -> Float
 wordToFloat w = unsafeDupablePerformIO $ alloca $ \(ptr :: Ptr Word32) -> do
     poke ptr w
     peek (castPtr ptr)
 
+{-# INLINE wordToDouble #-}
 wordToDouble :: Word64 -> Double
 wordToDouble w = unsafeDupablePerformIO $ alloca $ \(ptr :: Ptr Word64) -> do
     poke ptr w
