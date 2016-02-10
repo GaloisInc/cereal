@@ -541,6 +541,10 @@ instance GSerialize U1 where
     {-# INLINE gPut #-}
     {-# INLINE gGet #-}
 
+instance GSerialize V1 where
+    gPut _ = return ()
+    gGet = return (error "GSerialize V1")
+
 instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
     gPut (a :*: b) = gPut a *> gPut b
     gGet = (:*:) <$> gGet  <*> gGet
