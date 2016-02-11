@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP        #-}
 {-# LANGUAGE MagicHash  #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -98,7 +99,6 @@ module Data.Serialize.Get (
     , getMaybeOf
     , getEitherOf
     , getNested
-
   ) where
 
 import qualified Control.Applicative as A
@@ -171,7 +171,7 @@ emptyBuffer  = Just B.empty
 extendBuffer :: Buffer -> B.ByteString -> Buffer
 extendBuffer buf chunk =
   do bs <- buf
-     return (bs `B.append` chunk)
+     return $! bs `B.append` chunk
 {-# INLINE extendBuffer #-}
 
 append :: Buffer -> Buffer -> Buffer
@@ -366,20 +366,44 @@ runGetLazyState m lstr = case runGetLazy' m lstr of
 
 -- | If at least @n@ bytes of input are available, return the current
 --   input, otherwise fail.
-ensure :: Int -> Get B.ByteString
-ensure n = n `seq` Get $ \ s0 b0 m0 kf ks ->
-    if B.length s0 >= n
-    then ks s0 b0 m0 s0
-    else unGet (demandInput >> ensureRec n) s0 b0 m0 kf ks
 {-# INLINE ensure #-}
+ensure :: Int -> Get B.ByteString
+ensure n0 = n0 `seq` Get $ \ s0 b0 m0 kf ks -> let
+    n' = n0 - B.length s0
+    in if n' <= 0
+        then ks s0 b0 m0 s0
+        else getMore n' s0 [] b0 m0 kf ks
+    where
+        -- The "accumulate and concat" pattern here is important not to incur
+        -- in quadratic behavior, see <https://github.com/GaloisInc/cereal/issues/48>
 
--- | If at least @n@ bytes of input are available, return the current
---   input, otherwise fail.
-ensureRec :: Int -> Get B.ByteString
-ensureRec n = Get $ \s0 b0 m0 kf ks ->
-    if B.length s0 >= n
-    then ks s0 b0 m0 s0
-    else unGet (demandInput >> ensureRec n) s0 b0 m0 kf ks
+        finalInput s0 ss = B.concat (reverse (s0 : ss))
+        finalBuffer b0 s0 ss = extendBuffer b0 (B.concat (reverse (init (s0 : ss))))
+
+        getMore !n s0 ss b0 m0 kf ks = let
+            tooFewBytes = let
+                !s = finalInput s0 ss
+                !b = finalBuffer b0 s0 ss
+                in kf s b m0 ["demandInput"] "too few bytes"
+            in case m0 of
+                Complete -> tooFewBytes
+                Incomplete mb -> Partial $ \s ->
+                    if B.null s
+                        then tooFewBytes
+                        else let
+                            !mb' = case mb of
+                                Just l -> Just $! l - B.length s
+                                Nothing -> Nothing
+                            in checkIfEnough n s (s0 : ss) b0 (Incomplete mb') kf ks
+
+        checkIfEnough !n s0 ss b0 m0 kf ks = let
+            n' = n - B.length s0
+            in if n' <= 0
+                then let
+                    !s = finalInput s0 ss
+                    !b = finalBuffer b0 s0 ss
+                    in ks s b m0 s
+                else getMore n' s0 ss b0 m0 kf ks
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
@@ -394,23 +418,6 @@ isolate n m = do
   unless (B.null used) (fail "not all bytes parsed in isolate")
   put rest
   return a
-
--- | Immediately demand more input via a 'Partial' continuation
---   result.
-demandInput :: Get ()
-demandInput = Get $ \s0 b0 m0 kf ks ->
-  case m0 of
-    Complete      -> kf s0 b0 m0 ["demandInput"] "too few bytes"
-    Incomplete mb -> Partial $ \s ->
-      if B.null s
-      then kf s0 b0 m0 ["demandInput"] "too few bytes"
-      else let s1 = s0 `B.append` s
-               b1 = extendBuffer b0 s
-               mb' = case mb of
-                       Just l  -> Just $! l - B.length s
-                       Nothing -> Nothing
-            in b1  `seq`
-               mb' `seq` ks s1 b1 (Incomplete mb') ()
 
 failDesc :: String -> Get a
 failDesc err = do
