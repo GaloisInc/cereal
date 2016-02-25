@@ -12,6 +12,7 @@
 --
 module RoundTrip where
 
+import Data.Array.Unboxed
 import Data.Serialize
 import Data.Serialize.Get
 import Data.Serialize.Put
@@ -55,6 +56,9 @@ tests  = testGroup "Round Trip"
     $ roundTrip (putTwoOf putWord8 putWord8) (getTwoOf getWord8 getWord8)
   , testProperty "[Word8] Round Trip"
     $ roundTrip (putListOf putWord8) (getListOf getWord8)
+  , testProperty "UArray Int Word8" $ \list ->
+    roundTrip (putIArrayOf put putWord8 :: Putter (UArray Int Word8))
+              (getIArrayOf get getWord8) (listArray (0,length list) list)
   , testProperty "Maybe Word8 Round Trip"
     $ roundTrip (putMaybeOf putWord8) (getMaybeOf getWord8)
   , testProperty "Either Word8 Word16be Round Trip "

@@ -313,7 +313,7 @@ putListOf pa = \l -> do
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
 putIArrayOf pix pe a = do
   putTwoOf pix pix (bounds a)
-  putListOf pe (elems a)
+  mapM_ (pe . (a !)) (range $ bounds a)
 {-# INLINE putIArrayOf #-}
 
 putSeqOf :: Putter a -> Putter (Seq.Seq a)

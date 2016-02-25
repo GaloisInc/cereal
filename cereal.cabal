@@ -48,7 +48,8 @@ test-suite test-cereal
 
         type:                   exitcode-stdio-1.0
 
-        build-depends:          base == 4.*,
+        build-depends:          array,
+                                base == 4.*,
                                 bytestring,
                                 QuickCheck,
                                 test-framework,
