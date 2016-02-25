@@ -104,7 +104,7 @@ module Data.Serialize.Get (
 import qualified Control.Applicative as A
 import qualified Control.Monad as M
 import Control.Monad (unless)
-import Data.Array.IArray (IArray,listArray)
+import Data.Array.IArray (IArray, listArray, range)
 import Data.Ix (Ix)
 import Data.List (intercalate)
 import Data.Maybe (isNothing,fromMaybe)
@@ -763,12 +763,13 @@ getListOf m = go [] =<< getWord64be
 -- | Get an IArray in the following format:
 --   index (lower bound)
 --   index (upper bound)
---   Word64 (big endian format)
 --   element 1
 --   ...
 --   element n
 getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
-getIArrayOf ix e = M.liftM2 listArray (getTwoOf ix ix) (getListOf e)
+getIArrayOf ix e = do
+  bounds <- getTwoOf ix ix
+  listArray bounds <$> M.mapM (const e) (range bounds)
 
 -- | Get a sequence in the following format:
 --   Word64 (big endian format)
