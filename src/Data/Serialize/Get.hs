@@ -769,7 +769,7 @@ getListOf m = go [] =<< getWord64be
 getIArrayOf :: (Ix i, IArray a e) => Get i -> Get e -> Get (a i e)
 getIArrayOf ix e = do
   bounds <- getTwoOf ix ix
-  listArray bounds <$> M.mapM (const e) (range bounds)
+  listArray bounds `fmap` M.mapM (const e) (range bounds)
 
 -- | Get a sequence in the following format:
 --   Word64 (big endian format)
