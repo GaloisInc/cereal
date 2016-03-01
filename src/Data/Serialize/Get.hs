@@ -104,6 +104,7 @@ module Data.Serialize.Get (
 import qualified Control.Applicative as A
 import qualified Control.Monad as M
 import Control.Monad (unless)
+import qualified Control.Monad.Fail as Fail
 import Data.Array.IArray (IArray,listArray)
 import Data.Ix (Ix)
 import Data.List (intercalate)
@@ -232,9 +233,12 @@ instance Monad Get where
     (>>) = (A.*>)
     {-# INLINE (>>) #-}
 
-    fail     = failDesc
+    fail     = Fail.fail
     {-# INLINE fail #-}
 
+instance Fail.MonadFail Get where
+    fail     = failDesc
+    {-# INLINE fail #-}
 
 instance M.MonadPlus Get where
     mzero     = failDesc "mzero"
