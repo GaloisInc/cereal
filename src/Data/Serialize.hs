@@ -40,7 +40,8 @@ module Data.Serialize (
     , module Data.Serialize.IEEE754
 
     -- * Generic deriving
-    , GSerialize(..)
+    , GSerializePut(..)
+    , GSerializeGet(..)
     ) where
 
 import Data.Serialize.Put
@@ -93,10 +94,10 @@ class Serialize t where
     -- | Decode a value in the Get monad
     get :: Get t
 
-    default put :: (Generic t, GSerialize (Rep t)) => Putter t
+    default put :: (Generic t, GSerializePut (Rep t)) => Putter t
     put = gPut . from
 
-    default get :: (Generic t, GSerialize (Rep t)) => Get t
+    default get :: (Generic t, GSerializeGet (Rep t)) => Get t
     get = to <$> gGet
 
 ------------------------------------------------------------------------
@@ -522,35 +523,45 @@ instance (Serialize i, Ix i, Serialize e, IArray UArray e)
 ------------------------------------------------------------------------
 -- Generic Serialze
 
-class GSerialize f where
+class GSerializePut f where
     gPut :: Putter (f a)
+
+class GSerializeGet f where
     gGet :: Get (f a)
 
-instance GSerialize a => GSerialize (M1 i c a) where
+instance GSerializePut a => GSerializePut (M1 i c a) where
     gPut = gPut . unM1
+    {-# INLINE gPut #-}
+
+instance GSerializeGet a => GSerializeGet (M1 i c a) where
     gGet = M1 <$> gGet
-    {-# INLINE gPut #-}
     {-# INLINE gGet #-}
 
-instance Serialize a => GSerialize (K1 i a) where
+instance Serialize a => GSerializePut (K1 i a) where
     gPut = put . unK1
+    {-# INLINE gPut #-}
+
+instance Serialize a => GSerializeGet (K1 i a) where
     gGet = K1 <$> get
-    {-# INLINE gPut #-}
     {-# INLINE gGet #-}
 
-instance GSerialize U1 where
+instance GSerializePut U1 where
     gPut _ = pure ()
+    {-# INLINE gPut #-}
+
+instance GSerializeGet U1 where
     gGet   = pure U1
-    {-# INLINE gPut #-}
     {-# INLINE gGet #-}
 
-instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
+instance (GSerializePut a, GSerializePut b) => GSerializePut (a :*: b) where
     gPut (a :*: b) = gPut a *> gPut b
-    gGet = (:*:) <$> gGet  <*> gGet
     {-# INLINE gPut #-}
+
+instance (GSerializeGet a, GSerializeGet b) => GSerializeGet (a :*: b) where
+    gGet = (:*:) <$> gGet  <*> gGet
     {-# INLINE gGet #-}
 
--- The following GSerialize instance for sums has support for serializing types
+-- The following GSerialize* instance for sums has support for serializing types
 -- with up to 2^64-1 constructors. It will use the minimal number of bytes
 -- needed to encode the constructor. For example when a type has 2^8
 -- constructors or less it will use a single byte to encode the constructor. If
@@ -560,20 +571,24 @@ instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
 #define PUTSUM(WORD) GUARD(WORD) = putSum (0 :: WORD) (fromIntegral size)
 #define GETSUM(WORD) GUARD(WORD) = (get :: Get WORD) >>= checkGetSum (fromIntegral size)
 
-instance ( PutSum     a, PutSum     b
-         , GetSum     a, GetSum     b
-         , GSerialize a, GSerialize b
-         , SumSize    a, SumSize    b) => GSerialize (a :+: b) where
+instance ( PutSum        a, PutSum        b
+         , GetSum        a, GetSum        b
+         , GSerializePut a, GSerializePut b
+         , SumSize       a, SumSize       b) => GSerializePut (a :+: b) where
     gPut | PUTSUM(Word8) | PUTSUM(Word16) | PUTSUM(Word32) | PUTSUM(Word64)
          | otherwise = sizeError "encode" size
       where
         size = unTagged (sumSize :: Tagged (a :+: b) Word64)
+    {-# INLINE gPut #-}
 
+instance ( PutSum        a, PutSum        b
+         , GetSum        a, GetSum        b
+         , GSerializeGet a, GSerializeGet b
+         , SumSize       a, SumSize       b) => GSerializeGet (a :+: b) where
     gGet | GETSUM(Word8) | GETSUM(Word16) | GETSUM(Word32) | GETSUM(Word64)
          | otherwise = sizeError "decode" size
       where
         size = unTagged (sumSize :: Tagged (a :+: b) Word64)
-    {-# INLINE gPut #-}
     {-# INLINE gGet #-}
 
 sizeError :: Show size => String -> size -> error
@@ -584,7 +599,7 @@ sizeError s size = error $ "Can't " ++ s ++ " a type with " ++ show size ++ " co
 class PutSum f where
     putSum :: (Num word, Bits word, Serialize word) => word -> word -> Putter (f a)
 
-instance (PutSum a, PutSum b, GSerialize a, GSerialize b) => PutSum (a :+: b) where
+instance (PutSum a, PutSum b, GSerializePut a, GSerializePut b) => PutSum (a :+: b) where
     putSum !code !size s = case s of
                              L1 x -> putSum code           sizeL x
                              R1 x -> putSum (code + sizeL) sizeR x
@@ -597,7 +612,7 @@ instance (PutSum a, PutSum b, GSerialize a, GSerialize b) => PutSum (a :+: b) wh
           sizeR = size - sizeL
     {-# INLINE putSum #-}
 
-instance GSerialize a => PutSum (C1 c a) where
+instance GSerializePut a => PutSum (C1 c a) where
     putSum !code _ x = put code *> gPut x
     {-# INLINE putSum #-}
 
@@ -612,7 +627,7 @@ checkGetSum size code | code < size = getSum code size
 class GetSum f where
     getSum :: (Ord word, Num word, Bits word) => word -> word -> Get (f a)
 
-instance (GetSum a, GetSum b, GSerialize a, GSerialize b) => GetSum (a :+: b) where
+instance (GetSum a, GetSum b, GSerializeGet a, GSerializeGet b) => GetSum (a :+: b) where
     getSum !code !size | code < sizeL = L1 <$> getSum code           sizeL
                        | otherwise    = R1 <$> getSum (code - sizeL) sizeR
         where
@@ -624,7 +639,7 @@ instance (GetSum a, GetSum b, GSerialize a, GSerialize b) => GetSum (a :+: b) wh
           sizeR = size - sizeL
     {-# INLINE getSum #-}
 
-instance GSerialize a => GetSum (C1 c a) where
+instance GSerializeGet a => GetSum (C1 c a) where
     getSum _ _ = gGet
     {-# INLINE getSum #-}
 
