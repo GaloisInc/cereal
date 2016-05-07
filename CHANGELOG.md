@@ -5,6 +5,7 @@ Future
 * Implement the AMP recommended refactoring for the Functor/Applicative/Monad
   hierarchy for Get and PutM (thanks to Herbert Valerio Riedel!)
 * Unconditionally support GHC generics (thanks to Eric Mertens!)
+* Split the GSerialize class in two, to deal with a GHC bug (thanks Austin Seipp!)
 
 0.5.1.0
 =======
