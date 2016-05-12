@@ -25,3 +25,4 @@ executable cereal-bench
                      , bytestring >= 0.9
                      , criterion
                      , binary     >= 0.5
+                     , fail
