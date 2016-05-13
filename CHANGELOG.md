@@ -6,6 +6,7 @@ Future
   hierarchy for Get and PutM (thanks to Herbert Valerio Riedel!)
 * Unconditionally support GHC generics (thanks to Eric Mertens!)
 * Split the GSerialize class in two, to deal with a GHC bug (thanks Austin Seipp!)
+* No longer use Enum in the Serialize instance for Bool (thanks Francesco Mazzoli!)
 
 0.5.1.0
 =======
