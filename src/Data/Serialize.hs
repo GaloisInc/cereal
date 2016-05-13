@@ -140,15 +140,39 @@ instance Serialize () where
     put ()  = return ()
     get     = return ()
 
+{-# INLINE boolToWord8 #-}
+boolToWord8 :: Bool -> Word8
+boolToWord8 False = 0
+boolToWord8 True = 1
+
+{-# INLINE boolFromWord8 #-}
+boolFromWord8 :: Word8 -> Get Bool
+boolFromWord8 0 = return False
+boolFromWord8 1 = return True
+boolFromWord8 w = fail ("Invalid Bool encoding " ++ show w)
+
+{-# INLINE orderingToWord8 #-}
+orderingToWord8 :: Ordering -> Word8
+orderingToWord8 LT = 0
+orderingToWord8 EQ = 1
+orderingToWord8 GT = 2
+
+{-# INLINE orderingFromWord8 #-}
+orderingFromWord8 :: Word8 -> Get Ordering
+orderingFromWord8 0 = return LT
+orderingFromWord8 1 = return EQ
+orderingFromWord8 2 = return GT
+orderingFromWord8 w = fail ("Invalid Ordering encoding " ++ show w)
+
 -- Bools are encoded as a byte in the range 0 .. 1
 instance Serialize Bool where
-    put     = putWord8 . fromIntegral . fromEnum
-    get     = liftM (toEnum . fromIntegral) getWord8
+    put     = putWord8 . boolToWord8
+    get     = boolFromWord8 =<< getWord8
 
 -- Values of type 'Ordering' are encoded as a byte in the range 0 .. 2
 instance Serialize Ordering where
-    put     = putWord8 . fromIntegral . fromEnum
-    get     = liftM (toEnum . fromIntegral) getWord8
+    put     = putWord8 . orderingToWord8
+    get     = orderingFromWord8 =<< getWord8
 
 ------------------------------------------------------------------------
 -- Words and Ints
