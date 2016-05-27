@@ -1,5 +1,5 @@
 
-Future
+0.5.2.0
 ======
 
 * Implement the AMP recommended refactoring for the Functor/Applicative/Monad

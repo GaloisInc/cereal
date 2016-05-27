@@ -329,7 +329,7 @@ putTreeOf pa =
     go (T.Node x cs) = execPut (pa x) `M.mappend` encodeListOf go cs
 {-# INLINE putTreeOf #-}
 
-putMapOf :: Ord k => Putter k -> Putter a -> Putter (Map.Map k a)
+putMapOf :: Putter k -> Putter a -> Putter (Map.Map k a)
 putMapOf pk pa = putListOf (putTwoOf pk pa) . Map.toAscList
 {-# INLINE putMapOf #-}
 

@@ -270,13 +270,13 @@ instance Serialize Integer where
 --
 -- Fold and unfold an Integer to and from a list of its bytes
 --
-unroll :: (Integral a, Num a, Bits a) => a -> [Word8]
+unroll :: (Integral a, Bits a) => a -> [Word8]
 unroll = unfoldr step
   where
     step 0 = Nothing
     step i = Just (fromIntegral i, i `shiftR` 8)
 
-roll :: (Integral a, Num a, Bits a) => [Word8] -> a
+roll :: (Integral a, Bits a) => [Word8] -> a
 roll   = foldr unstep 0
   where
     unstep b a = a `shiftL` 8 .|. fromIntegral b
@@ -596,8 +596,6 @@ instance (GSerializeGet a, GSerializeGet b) => GSerializeGet (a :*: b) where
 #define GETSUM(WORD) GUARD(WORD) = (get :: Get WORD) >>= checkGetSum (fromIntegral size)
 
 instance ( PutSum        a, PutSum        b
-         , GetSum        a, GetSum        b
-         , GSerializePut a, GSerializePut b
          , SumSize       a, SumSize       b) => GSerializePut (a :+: b) where
     gPut | PUTSUM(Word8) | PUTSUM(Word16) | PUTSUM(Word32) | PUTSUM(Word64)
          | otherwise = sizeError "encode" size
@@ -605,9 +603,7 @@ instance ( PutSum        a, PutSum        b
         size = unTagged (sumSize :: Tagged (a :+: b) Word64)
     {-# INLINE gPut #-}
 
-instance ( PutSum        a, PutSum        b
-         , GetSum        a, GetSum        b
-         , GSerializeGet a, GSerializeGet b
+instance ( GetSum        a, GetSum        b
          , SumSize       a, SumSize       b) => GSerializeGet (a :+: b) where
     gGet | GETSUM(Word8) | GETSUM(Word16) | GETSUM(Word32) | GETSUM(Word64)
          | otherwise = sizeError "decode" size
@@ -623,7 +619,7 @@ sizeError s size = error $ "Can't " ++ s ++ " a type with " ++ show size ++ " co
 class PutSum f where
     putSum :: (Num word, Bits word, Serialize word) => word -> word -> Putter (f a)
 
-instance (PutSum a, PutSum b, GSerializePut a, GSerializePut b) => PutSum (a :+: b) where
+instance (PutSum a, PutSum b) => PutSum (a :+: b) where
     putSum !code !size s = case s of
                              L1 x -> putSum code           sizeL x
                              R1 x -> putSum (code + sizeL) sizeR x
@@ -651,7 +647,7 @@ checkGetSum size code | code < size = getSum code size
 class GetSum f where
     getSum :: (Ord word, Num word, Bits word) => word -> word -> Get (f a)
 
-instance (GetSum a, GetSum b, GSerializeGet a, GSerializeGet b) => GetSum (a :+: b) where
+instance (GetSum a, GetSum b) => GetSum (a :+: b) where
     getSum !code !size | code < sizeL = L1 <$> getSum code           sizeL
                        | otherwise    = R1 <$> getSum (code - sizeL) sizeR
         where
