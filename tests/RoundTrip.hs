@@ -4,7 +4,7 @@
 -- |
 -- Module      : 
 -- Copyright   : (c) Galois, Inc, 2009
--- License     : AllRightsReserved
+-- License     : BSD3
 --
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   : 
