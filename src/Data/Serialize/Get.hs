@@ -434,7 +434,8 @@ skip n = do
   s <- ensure n
   put (B.drop n s)
 
--- | Skip ahead @n@ bytes. No error if there isn't enough bytes.
+-- | Skip ahead up to @n@ bytes in the current chunk. No error if there aren't
+-- enough bytes, or if less than @n@ bytes are skipped.
 uncheckedSkip :: Int -> Get ()
 uncheckedSkip n = do
     s <- get
@@ -470,7 +471,8 @@ lookAheadE gea = do
         _      -> return ()
     return ea
 
--- | Get the next up to @n@ bytes as a ByteString, without consuming them.
+-- | Get the next up to @n@ bytes as a ByteString until end of this chunk,
+-- without consuming them.
 uncheckedLookAhead :: Int -> Get B.ByteString
 uncheckedLookAhead n = do
     s <- get
