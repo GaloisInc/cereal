@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 #ifndef MIN_VERSION_base
 #define MIN_VERSION_base(x,y,z) 0
@@ -166,6 +167,13 @@ instance Monad PutM where
 
     (>>) = (*>)
     {-# INLINE (>>) #-}
+
+instance Monoid (PutM ()) where
+    mempty = pure ()
+    {-# INLINE mempty #-}
+
+    mappend = (*>)
+    {-# INLINE mappend #-}
 
 tell :: Putter Builder
 tell b = Put $! PairS () b
