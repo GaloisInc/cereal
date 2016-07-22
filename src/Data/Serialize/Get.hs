@@ -299,17 +299,16 @@ runGetChunk :: Get a -> Maybe Int -> B.ByteString -> Result a
 runGetChunk m mbLen str = unGet m str Nothing (Incomplete mbLen) failK finalK
 {-# INLINE runGetChunk #-}
 
--- | Run the Get monad applies a 'get'-based parser on the input ByteString
+-- | Run the Get monad. Returns the 'Result' directly, exposing the incremental
+-- interface.
 runGetPartial :: Get a -> B.ByteString -> Result a
 runGetPartial m = runGetChunk m Nothing
 {-# INLINE runGetPartial #-}
 
--- | Run the Get monad applies a 'get'-based parser on the input
--- ByteString. Additional to the result of get it returns the number of
--- consumed bytes and the rest of the input.
-runGetState :: Get a -> B.ByteString -> Int
-            -> Either String (a, B.ByteString)
-runGetState m str off = case runGetState' m str off of
+-- | Run the Get monad. In addition to returning the result, this run function
+-- also returns the unconsumed input.
+runGetState :: Get a -> B.ByteString -> Either String (a, B.ByteString)
+runGetState m str off = case runGetState' m str of
   (Right a,bs) -> Right (a,bs)
   (Left i,_)   -> Left i
 {-# INLINE runGetState #-}
@@ -317,10 +316,9 @@ runGetState m str off = case runGetState' m str off of
 -- | Run the Get monad applies a 'get'-based parser on the input
 -- ByteString. Additional to the result of get it returns the number of
 -- consumed bytes and the rest of the input, even in the event of a failure.
-runGetState' :: Get a -> B.ByteString -> Int
-             -> (Either String a, B.ByteString)
-runGetState' m str off =
-  case unGet m (B.drop off str) Nothing Complete failK finalK of
+runGetState' :: Get a -> B.ByteString -> Int -> (Either String a, B.ByteString)
+runGetState' m str =
+  case unGet m str Nothing Complete failK finalK of
     Fail i bs -> (Left i,bs)
     Done a bs -> (Right a, bs)
     Partial{} -> (Left "Failed reading: Internal error: unexpected Partial.",B.empty)
@@ -333,8 +331,8 @@ runGetState' m str off =
 runGetLazy' :: Get a -> L.ByteString -> (Either String a,L.ByteString)
 runGetLazy' m lstr =
   case L.toChunks lstr of
-    [c]  -> wrapStrict (runGetState' m c       0)
-    []   -> wrapStrict (runGetState' m B.empty 0)
+    [c]  -> wrapStrict (runGetState' m c      )
+    []   -> wrapStrict (runGetState' m B.empty)
     c:cs -> loop (runGetChunk m (Just (len - B.length c)) c) cs
   where
   len = fromIntegral (L.length lstr)
@@ -358,8 +356,9 @@ runGetLazy :: Get a -> L.ByteString -> Either String a
 runGetLazy m lstr = fst (runGetLazy' m lstr)
 {-# INLINE runGetLazy #-}
 
--- | Run the Get monad over a Lazy ByteString.  Note that this does not run the
--- Get parser lazily, but will operate on lazy ByteStrings.
+-- | Run the Get monad over a Lazy ByteString, yielding out any unconsumed input
+-- in addition to the result.  Note that this does not run the Get parser
+-- lazily, but will operate on lazy ByteStrings.
 runGetLazyState :: Get a -> L.ByteString -> Either String (a,L.ByteString)
 runGetLazyState m lstr = case runGetLazy' m lstr of
   (Right a,rest) -> Right (a,rest)
