@@ -14,7 +14,7 @@
 -- Module      : Data.Serialize.Put
 -- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
--- 
+--
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   :
 -- Portability :
@@ -41,6 +41,7 @@ module Data.Serialize.Put (
 
     -- * Primitives
     , putWord8
+    , putInt8
     , putByteString
     , putLazyByteString
 
@@ -52,17 +53,27 @@ module Data.Serialize.Put (
     , putWord16be
     , putWord32be
     , putWord64be
+    , putInt16be
+    , putInt32be
+    , putInt64be
 
     -- * Little-endian primitives
     , putWord16le
     , putWord32le
     , putWord64le
+    , putInt16le
+    , putInt32le
+    , putInt64le
 
     -- * Host-endian, unaligned writes
     , putWordhost
     , putWord16host
     , putWord32host
     , putWord64host
+    , putInthost
+    , putInt16host
+    , putInt32host
+    , putInt64host
 
     -- * Containers
     , putTwoOf
@@ -102,6 +113,7 @@ import Data.Array.Unboxed
 import qualified Data.Monoid as M
 import qualified Data.Foldable as F
 import Data.Word
+import Data.Int
 import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
 import qualified Data.IntMap            as IntMap
@@ -119,7 +131,7 @@ import Data.Monoid
 
 ------------------------------------------------------------------------
 
--- XXX Strict in builder only. 
+-- XXX Strict in builder only.
 data PairS a = PairS a !Builder
 
 sndS :: PairS a -> Builder
@@ -221,6 +233,11 @@ putWord8            :: Putter Word8
 putWord8            = tell . B.word8
 {-# INLINE putWord8 #-}
 
+-- | Efficiently write an int into the output buffer
+putInt8             :: Putter Int8
+putInt8             = tell . B.int8
+{-# INLINE putInt8 #-}
+
 -- | An efficient primitive to write a strict ByteString into the output buffer.
 -- It flushes the current buffer, and writes the argument into a new chunk.
 putByteString       :: Putter S.ByteString
@@ -299,6 +316,67 @@ putWord64host       :: Putter Word64
 putWord64host       = tell . B.word64Host
 {-# INLINE putWord64host #-}
 
+-- | Write a Int16 in big endian format
+putInt16be         :: Putter Int16
+putInt16be         = tell . B.int16BE
+{-# INLINE putInt16be #-}
+
+-- | Write a Int16 in little endian format
+putInt16le         :: Putter Int16
+putInt16le         = tell . B.int16LE
+{-# INLINE putInt16le #-}
+
+-- | Write a Int32 in big endian format
+putInt32be         :: Putter Int32
+putInt32be         = tell . B.int32BE
+{-# INLINE putInt32be #-}
+
+-- | Write a Int32 in little endian format
+putInt32le         :: Putter Int32
+putInt32le         = tell . B.int32LE
+{-# INLINE putInt32le #-}
+
+-- | Write a Int64 in big endian format
+putInt64be         :: Putter Int64
+putInt64be         = tell . B.int64BE
+{-# INLINE putInt64be #-}
+
+-- | Write a Int64 in little endian format
+putInt64le         :: Putter Int64
+putInt64le         = tell . B.int64LE
+{-# INLINE putInt64le #-}
+
+------------------------------------------------------------------------
+
+-- | /O(1)./ Write a single native machine int. The int is
+-- written in host order, host endian form, for the machine you're on.
+-- On a 64 bit machine the Int is an 8 byte value, on a 32 bit machine,
+-- 4 bytes. Values written this way are not portable to
+-- different endian or int sized machines, without conversion.
+--
+putInthost         :: Putter Int
+putInthost         = tell . B.intHost
+{-# INLINE putInthost #-}
+
+-- | /O(1)./ Write a Int16 in native host order and host endianness.
+-- For portability issues see @putInthost@.
+putInt16host       :: Putter Int16
+putInt16host       = tell . B.int16Host
+{-# INLINE putInt16host #-}
+
+-- | /O(1)./ Write a Int32 in native host order and host endianness.
+-- For portability issues see @putInthost@.
+putInt32host       :: Putter Int32
+putInt32host       = tell . B.int32Host
+{-# INLINE putInt32host #-}
+
+-- | /O(1)./ Write a Int64 in native host order
+-- On a 32 bit machine we write two host order Int32s, in big endian form.
+-- For portability issues see @putInthost@.
+putInt64host       :: Putter Int64
+putInt64host       = tell . B.int64Host
+{-# INLINE putInt64host #-}
+
 
 -- Containers ------------------------------------------------------------------
 
@@ -326,12 +404,12 @@ putIArrayOf pix pe a = do
 
 putSeqOf :: Putter a -> Putter (Seq.Seq a)
 putSeqOf pa = \s -> do
-    putWord64be (fromIntegral $ Seq.length s) 
+    putWord64be (fromIntegral $ Seq.length s)
     F.mapM_ pa s
 {-# INLINE putSeqOf #-}
 
 putTreeOf :: Putter a -> Putter (T.Tree a)
-putTreeOf pa = 
+putTreeOf pa =
     tell . go
   where
     go (T.Node x cs) = execPut (pa x) `M.mappend` encodeListOf go cs
