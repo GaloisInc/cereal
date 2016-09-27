@@ -41,6 +41,7 @@ module Data.Serialize.Put (
 
     -- * Primitives
     , putWord8
+    , putInt8
     , putByteString
     , putLazyByteString
 
@@ -231,6 +232,11 @@ flush               = tell B.flush
 putWord8            :: Putter Word8
 putWord8            = tell . B.word8
 {-# INLINE putWord8 #-}
+
+-- | Efficiently write an int into the output buffer
+putInt8             :: Putter Int8
+putInt8             = tell . B.int8
+{-# INLINE putInt8 #-}
 
 -- | An efficient primitive to write a strict ByteString into the output buffer.
 -- It flushes the current buffer, and writes the argument into a new chunk.

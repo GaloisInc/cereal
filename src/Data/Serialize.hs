@@ -16,7 +16,7 @@
 -- Module      : Data.Serialize
 -- Copyright   : Lennart Kolmodin, Galois Inc. 2009
 -- License     : BSD3-style (see LICENSE)
--- 
+--
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
 -- Stability   :
 -- Portability :
@@ -199,23 +199,23 @@ instance Serialize Word64 where
 
 -- Int8s are written as a single byte.
 instance Serialize Int8 where
-    put i   = put (fromIntegral i :: Word8)
-    get     = liftM fromIntegral (get :: Get Word8)
+    put     = putInt8
+    get     = getInt8
 
 -- Int16s are written as a 2 bytes in big endian format
 instance Serialize Int16 where
-    put i   = put (fromIntegral i :: Word16)
-    get     = liftM fromIntegral (get :: Get Word16)
+    put     = putInt16be
+    get     = getInt16be
 
 -- Int32s are written as a 4 bytes in big endian format
 instance Serialize Int32 where
-    put i   = put (fromIntegral i :: Word32)
-    get     = liftM fromIntegral (get :: Get Word32)
+    put     = putInt32be
+    get     = getInt32be
 
 -- Int64s are written as a 8 bytes in big endian format
 instance Serialize Int64 where
-    put i   = put (fromIntegral i :: Word64)
-    get     = liftM fromIntegral (get :: Get Word64)
+    put     = putInt64be
+    get     = getInt64be
 
 ------------------------------------------------------------------------
 
@@ -230,7 +230,7 @@ instance Serialize Int where
     get     = liftM fromIntegral (get :: Get Int64)
 
 ------------------------------------------------------------------------
--- 
+--
 -- Portable, and pretty efficient, serialisation of Integer
 --
 
@@ -312,7 +312,7 @@ instance Serialize Natural where
 
 ------------------------------------------------------------------------
 
--- Safely wrap `chr` to avoid exceptions. 
+-- Safely wrap `chr` to avoid exceptions.
 -- `chr` source: http://hackage.haskell.org/package/base-4.7.0.2/docs/src/GHC-Char.html#chr
 chrEither :: Int -> Either String Char
 chrEither i
@@ -362,7 +362,7 @@ instance Serialize Char where
                                 return (z .|. shiftL6 (y .|. shiftL6
                                         (x .|. shiftL6 (xor 0xf0 w))))
         case chrEither r of
-            Right r' -> 
+            Right r' ->
                 return $! r'
             Left err ->
                 fail err
@@ -388,7 +388,7 @@ instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e)
     put (a,b,c,d,e)     = put a >> put b >> put c >> put d >> put e
     get                 = liftM5 (,,,,) get get get get get
 
--- 
+--
 -- and now just recurse:
 --
 
