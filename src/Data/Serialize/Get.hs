@@ -46,6 +46,7 @@ module Data.Serialize.Get (
     , lookAheadM
     , lookAheadE
     , uncheckedLookAhead
+    , bytesRead
 
     -- * Utility
     , getBytes
@@ -160,8 +161,8 @@ instance Functor Result where
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
   { unGet :: forall r. Input -> Buffer -> More
-                    -> Failure r -> Success a r
-                    -> Result r }
+                    -> Int -> Failure r
+                    -> Success a r -> Result r }
 
 type Input  = B.ByteString
 type Buffer = Maybe B.ByteString
@@ -184,7 +185,7 @@ bufferBytes  = fromMaybe B.empty
 {-# INLINE bufferBytes #-}
 
 type Failure   r = Input -> Buffer -> More -> [String] -> String -> Result r
-type Success a r = Input -> Buffer -> More -> a                  -> Result r
+type Success a r = Input -> Buffer -> More -> Int      -> a      -> Result r
 
 -- | Have we read all available input?
 data More
@@ -198,20 +199,20 @@ moreLength m = case m of
   Incomplete mb -> fromMaybe 0 mb
 
 instance Functor Get where
-    fmap p m =        Get $ \ s0 b0 m0 kf ks ->
-      unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> ks s1 b1 m1 (p a)
+    fmap p m =           Get $ \ s0 b0 m0 w0 kf ks ->
+      unGet m s0 b0 m0 w0 kf $ \ s1 b1 m1 w1 a  -> ks s1 b1 m1 w1 (p a)
 
 instance A.Applicative Get where
-    pure a = Get $ \ s0 b0 m0 _ ks -> ks s0 b0 m0 a
+    pure a = Get $ \ s0 b0 m0 w _ ks -> ks s0 b0 m0 w a
     {-# INLINE pure #-}
 
-    f <*> x =         Get $ \ s0 b0 m0 kf ks ->
-      unGet f s0 b0 m0 kf $ \ s1 b1 m1 g     ->
-      unGet x s1 b1 m1 kf $ \ s2 b2 m2 y     -> ks s2 b2 m2 (g y)
+    f <*> x =            Get $ \ s0 b0 m0 w0 kf ks ->
+      unGet f s0 b0 m0 w0 kf $ \ s1 b1 m1 w1 g     ->
+      unGet x s1 b1 m1 w1 kf $ \ s2 b2 m2 w2 y  -> ks s2 b2 m2 w2 (g y)
     {-# INLINE (<*>) #-}
 
-    m *> k =          Get $ \ s0 b0 m0 kf ks ->
-      unGet m s0 b0 m0 kf $ \ s1 b1 m1 _     -> unGet k s1 b1 m1 kf ks
+    m *> k =             Get $ \ s0 b0 m0 w0 kf ks ->
+      unGet m s0 b0 m0 w0 kf $ \ s1 b1 m1 w1 _     -> unGet k s1 b1 m1 w1 kf ks
     {-# INLINE (*>) #-}
 
 instance A.Alternative Get where
@@ -226,8 +227,8 @@ instance Monad Get where
     return = A.pure
     {-# INLINE return #-}
 
-    m >>= g  =        Get $ \ s0 b0 m0 kf ks ->
-      unGet m s0 b0 m0 kf $ \ s1 b1 m1 a     -> unGet (g a) s1 b1 m1 kf ks
+    m >>= g  =           Get $ \ s0 b0 m0 w0 kf ks ->
+      unGet m s0 b0 m0 w0 kf $ \ s1 b1 m1 w1 a     -> unGet (g a) s1 b1 m1 w1 kf ks
     {-# INLINE (>>=) #-}
 
     (>>) = (A.*>)
@@ -243,15 +244,15 @@ instance Fail.MonadFail Get where
 instance M.MonadPlus Get where
     mzero     = failDesc "mzero"
     {-# INLINE mzero #-}
-
+-- TODO: Test this!
     mplus a b =
-      Get $ \s0 b0 m0 kf ks ->
+      Get $ \s0 b0 m0 w0 kf ks ->
         let ks' s1 b1        = ks s1 (b0 `append` b1)
             kf' _  b1 m1     = kf (s0 `B.append` bufferBytes b1)
                                   (b0 `append` b1) m1
             try _  b1 m1 _ _ = unGet b (s0 `B.append` bufferBytes b1)
-                                       b1 m1 kf' ks'
-         in unGet a s0 emptyBuffer m0 try ks'
+                                       b1 m1 w0 kf' ks'
+         in unGet a s0 emptyBuffer m0 w0 try ks'
     {-# INLINE mplus #-}
 
 
@@ -262,21 +263,21 @@ formatTrace [] = "Empty call stack"
 formatTrace ls = "From:\t" ++ intercalate "\n\t" ls ++ "\n"
 
 get :: Get B.ByteString
-get  = Get (\s0 b0 m0 _ k -> k s0 b0 m0 s0)
+get  = Get (\s0 b0 m0 w _ k -> k s0 b0 m0 w s0)
 {-# INLINE get #-}
 
-put :: B.ByteString -> Get ()
-put s = Get (\_ b0 m _ k -> k s b0 m ())
+put :: B.ByteString -> Int -> Get ()
+put s w = Get (\_ b0 m _ _ k -> k s b0 m w ())
 {-# INLINE put #-}
 
 label :: String -> Get a -> Get a
 label l m =
-  Get $ \ s0 b0 m0 kf ks ->
+  Get $ \ s0 b0 m0 w0 kf ks ->
     let kf' s1 b1 m1 ls = kf s1 b1 m1 (l:ls)
-     in unGet m s0 b0 m0 kf' ks
+     in unGet m s0 b0 m0 w0 kf' ks
 
 finalK :: Success a a
-finalK s _ _ a = Done a s
+finalK s _ _ _ a = Done a s
 
 failK :: Failure a
 failK s b _ ls msg =
@@ -285,7 +286,7 @@ failK s b _ ls msg =
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
 runGet m str =
-  case unGet m str Nothing Complete failK finalK of
+  case unGet m str Nothing Complete 0 failK finalK of
     Fail i _  -> Left i
     Done a _  -> Right a
     Partial{} -> Left "Failed reading: Internal error: unexpected Partial."
@@ -296,7 +297,7 @@ runGet m str =
 -- input is left.  For example, with a lazy ByteString, the optional length
 -- represents the sum of the lengths of all remaining chunks.
 runGetChunk :: Get a -> Maybe Int -> B.ByteString -> Result a
-runGetChunk m mbLen str = unGet m str Nothing (Incomplete mbLen) failK finalK
+runGetChunk m mbLen str = unGet m str Nothing (Incomplete mbLen) 0 failK finalK
 {-# INLINE runGetChunk #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
@@ -320,7 +321,7 @@ runGetState m str off = case runGetState' m str off of
 runGetState' :: Get a -> B.ByteString -> Int
              -> (Either String a, B.ByteString)
 runGetState' m str off =
-  case unGet m (B.drop off str) Nothing Complete failK finalK of
+  case unGet m (B.drop off str) Nothing Complete 0 failK finalK of
     Fail i bs -> (Left i,bs)
     Done a bs -> (Right a, bs)
     Partial{} -> (Left "Failed reading: Internal error: unexpected Partial.",B.empty)
@@ -344,7 +345,6 @@ runGetLazy' m lstr =
   loop result chunks = case result of
 
     Fail str rest -> (Left str, L.fromChunks (rest : chunks))
-
     Partial k     -> case chunks of
                        c:cs -> loop (k c)       cs
                        []   -> loop (k B.empty) []
@@ -372,19 +372,18 @@ runGetLazyState m lstr = case runGetLazy' m lstr of
 --   input, otherwise fail.
 {-# INLINE ensure #-}
 ensure :: Int -> Get B.ByteString
-ensure n0 = n0 `seq` Get $ \ s0 b0 m0 kf ks -> let
+ensure n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
     n' = n0 - B.length s0
     in if n' <= 0
-        then ks s0 b0 m0 s0
-        else getMore n' s0 [] b0 m0 kf ks
+        then ks s0 b0 m0 w0 s0
+        else getMore n' s0 [] b0 m0 w0 kf ks
     where
         -- The "accumulate and concat" pattern here is important not to incur
         -- in quadratic behavior, see <https://github.com/GaloisInc/cereal/issues/48>
 
         finalInput s0 ss = B.concat (reverse (s0 : ss))
         finalBuffer b0 s0 ss = extendBuffer b0 (B.concat (reverse (init (s0 : ss))))
-
-        getMore !n s0 ss b0 m0 kf ks = let
+        getMore !n s0 ss b0 m0 w0 kf ks = let
             tooFewBytes = let
                 !s = finalInput s0 ss
                 !b = finalBuffer b0 s0 ss
@@ -398,16 +397,16 @@ ensure n0 = n0 `seq` Get $ \ s0 b0 m0 kf ks -> let
                             !mb' = case mb of
                                 Just l -> Just $! l - B.length s
                                 Nothing -> Nothing
-                            in checkIfEnough n s (s0 : ss) b0 (Incomplete mb') kf ks
+                            in checkIfEnough n s (s0 : ss) b0 (Incomplete mb') w0 kf ks
 
-        checkIfEnough !n s0 ss b0 m0 kf ks = let
+        checkIfEnough !n s0 ss b0 m0 w0 kf ks = let
             n' = n - B.length s0
             in if n' <= 0
                 then let
                     !s = finalInput s0 ss
                     !b = finalBuffer b0 s0 ss
-                    in ks s b m0 s
-                else getMore n' s0 ss b0 m0 kf ks
+                    in ks s b m0 w0 s
+                else getMore n' s0 ss b0 m0 w0 kf ks
 
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
@@ -416,48 +415,52 @@ isolate n m = do
   M.when (n < 0) (fail "Attempted to isolate a negative number of bytes")
   s <- ensure n
   let (s',rest) = B.splitAt n s
-  put s'
+  cur <- bytesRead
+  put s' cur
   a    <- m
   used <- get
   unless (B.null used) (fail "not all bytes parsed in isolate")
-  put rest
+  put rest (cur + n)
   return a
 
 failDesc :: String -> Get a
 failDesc err = do
     let msg = "Failed reading: " ++ err
-    Get (\s0 b0 m0 kf _ -> kf s0 b0 m0 [] msg)
+    Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 [] msg)
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
 skip n = do
   s <- ensure n
-  put (B.drop n s)
+  cur <- bytesRead
+  put (B.drop n s) (cur + n)
 
 -- | Skip ahead up to @n@ bytes in the current chunk. No error if there aren't
 -- enough bytes, or if less than @n@ bytes are skipped.
 uncheckedSkip :: Int -> Get ()
 uncheckedSkip n = do
     s <- get
-    put (B.drop n s)
+    cur <- bytesRead
+    put (B.drop n s) (cur + n)
 
 -- | Run @ga@, but return without consuming its input.
 -- Fails if @ga@ fails.
 lookAhead :: Get a -> Get a
-lookAhead ga = Get $ \ s0 b0 m0 kf ks ->
+lookAhead ga = Get $ \ s0 b0 m0 w0 kf ks ->
   -- the new continuation extends the old input with the new buffered bytes, and
   -- appends the new buffer to the old one, if there was one.
   let ks' _ b1 = ks (s0 `B.append` bufferBytes b1) (b0 `append` b1)
       kf' _ b1 = kf s0 (b0 `append` b1)
-   in unGet ga s0 emptyBuffer m0 kf' ks'
+   in unGet ga s0 emptyBuffer m0 w0 kf' ks'
 
 -- | Like 'lookAhead', but consume the input if @gma@ returns 'Just _'.
 -- Fails if @gma@ fails.
 lookAheadM :: Get (Maybe a) -> Get (Maybe a)
 lookAheadM gma = do
     s <- get
+    pre <- bytesRead
     ma <- gma
-    M.when (isNothing ma) (put s)
+    M.when (isNothing ma) (put s pre)
     return ma
 
 -- | Like 'lookAhead', but consume the input if @gea@ returns 'Right _'.
@@ -465,9 +468,10 @@ lookAheadM gma = do
 lookAheadE :: Get (Either a b) -> Get (Either a b)
 lookAheadE gea = do
     s <- get
+    pre <- bytesRead
     ea <- gea
     case ea of
-        Left _ -> put s
+        Left _ -> put s pre
         _      -> return ()
     return ea
 
@@ -487,14 +491,14 @@ uncheckedLookAhead n = do
 -- WARNING: when run with @runGetPartial@, remaining will only return the number
 -- of bytes that are remaining in the current input.
 remaining :: Get Int
-remaining = Get (\ s0 b0 m0 _ ks -> ks s0 b0 m0 (B.length s0 + moreLength m0))
+remaining = Get (\ s0 b0 m0 w0 _ ks -> ks s0 b0 m0 w0 (B.length s0 + moreLength m0))
 
 -- | Test whether all input has been consumed.
 --
 -- WARNING: when run with @runGetPartial@, isEmpty will only tell you if you're
 -- at the end of the current chunk.
 isEmpty :: Get Bool
-isEmpty = Get (\ s0 b0 m0 _ ks -> ks s0 b0 m0 (B.null s0 && moreLength m0 == 0))
+isEmpty = Get (\ s0 b0 m0 w0 _ ks -> ks s0 b0 m0 w0 (B.null s0 && moreLength m0 == 0))
 
 ------------------------------------------------------------------------
 -- Utility with ByteStrings
@@ -530,7 +534,8 @@ getBytes n = do
     let consume = B.unsafeTake n s
         rest    = B.unsafeDrop n s
         -- (consume,rest) = B.splitAt n s
-    put rest
+    cur <- bytesRead
+    put rest (cur + n)
     return consume
 {-# INLINE getBytes #-}
 
@@ -835,3 +840,7 @@ getNested :: Get Int -> Get a -> Get a
 getNested getLen getVal = do
     n <- getLen
     isolate n getVal
+
+-- | Get the number of bytes read up to this point
+bytesRead :: Get Int
+bytesRead = Get (\i b m w _ k -> k i b m w w)
