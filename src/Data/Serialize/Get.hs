@@ -267,7 +267,7 @@ get  = Get (\s0 b0 m0 w _ k -> k s0 b0 m0 w s0)
 {-# INLINE get #-}
 
 put :: B.ByteString -> Int -> Get ()
-put s w = Get (\_ b0 m _ _ k -> k s b0 m w ())
+put s !w = Get (\_ b0 m _ _ k -> k s b0 m w ())
 {-# INLINE put #-}
 
 label :: String -> Get a -> Get a
