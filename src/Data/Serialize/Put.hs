@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -44,10 +45,7 @@ module Data.Serialize.Put (
     , putInt8
     , putByteString
     , putLazyByteString
-
-#if MIN_VERSION_bytestring(0,10,4)
     , putShortByteString
-#endif
 
     -- * Big-endian primitives
     , putWord16be
@@ -92,21 +90,10 @@ module Data.Serialize.Put (
   ) where
 
 
-#if MIN_VERSION_bytestring(0,10,2)
 import           Data.ByteString.Builder (Builder, toLazyByteString)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Builder.Extra as B
-#elif MIN_VERSION_bytestring(0,10,0)
-import           Data.ByteString.Lazy.Builder (Builder, toLazyByteString)
-import qualified Data.ByteString.Lazy.Builder as B
-import qualified Data.ByteString.Lazy.Builder.Extras as B
-#else
-#error "cereal requires bytestring >= 0.10.0.0"
-#endif
-
-#if MIN_VERSION_bytestring(0,10,4)
 import qualified Data.ByteString.Short as BS
-#endif
 
 import qualified Control.Applicative as A
 import Data.Array.Unboxed
@@ -127,6 +114,14 @@ import qualified Data.Tree              as T
 import Control.Applicative
 import Data.Foldable (foldMap)
 import Data.Monoid
+#endif
+
+#if !(MIN_VERSION_bytestring(0,10,0))
+import Foreign.ForeignPtr (withForeignPtr)
+import Foreign.Marshal.Utils (copyBytes)
+import Foreign.Ptr (plusPtr)
+import qualified Data.ByteString.Internal as S
+import qualified Data.ByteString.Lazy.Internal as L
 #endif
 
 ------------------------------------------------------------------------
@@ -202,12 +197,12 @@ execPut = sndS . unPut
 
 -- | Run the 'Put' monad with a serialiser
 runPut :: Put -> S.ByteString
-runPut = L.toStrict . runPutLazy
+runPut = lazyToStrictByteString . runPutLazy
 {-# INLINE runPut #-}
 
 -- | Run the 'Put' monad with a serialiser and get its result
 runPutM :: PutM a -> (a, S.ByteString)
-runPutM (Put (PairS f s)) = (f, L.toStrict (toLazyByteString s))
+runPutM (Put (PairS f s)) = (f, lazyToStrictByteString (toLazyByteString s))
 {-# INLINE runPutM #-}
 
 -- | Run the 'Put' monad with a serialiser
@@ -244,10 +239,8 @@ putByteString       :: Putter S.ByteString
 putByteString       = tell . B.byteString
 {-# INLINE putByteString #-}
 
-#if MIN_VERSION_bytestring(0,10,4)
 putShortByteString  :: Putter BS.ShortByteString
 putShortByteString   = tell . B.shortByteString
-#endif
 
 -- | Write a lazy ByteString efficiently, simply appending the lazy
 -- ByteString chunks to the output buffer
@@ -448,3 +441,28 @@ putNested putLen putVal = do
     let bs = runPut putVal
     putLen (S.length bs)
     putByteString bs
+
+-------------------------------------------------------------------------------
+-- pre-bytestring-0.10 compatibility
+-------------------------------------------------------------------------------
+
+{-# INLINE lazyToStrictByteString #-}
+lazyToStrictByteString :: L.ByteString -> S.ByteString
+#if MIN_VERSION_bytestring(0,10,0)
+lazyToStrictByteString = L.toStrict
+#else
+lazyToStrictByteString = packChunks
+
+-- packChunks is taken from the blaze-builder package.
+
+-- | Pack the chunks of a lazy bytestring into a single strict bytestring.
+packChunks :: L.ByteString -> S.ByteString
+packChunks lbs = do
+    S.unsafeCreate (fromIntegral $ L.length lbs) (copyChunks lbs)
+  where
+    copyChunks !L.Empty                         !_pf = return ()
+    copyChunks !(L.Chunk (S.PS fpbuf o l) lbs') !pf  = do
+        withForeignPtr fpbuf $ \pbuf ->
+            copyBytes pf (pbuf `plusPtr` o) l
+        copyChunks lbs' (pf `plusPtr` l)
+#endif
