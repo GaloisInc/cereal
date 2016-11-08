@@ -25,15 +25,28 @@ source-repository head
   type:     git
   location: git://github.com/GaloisInc/cereal.git
 
+flag bytestring-builder
+  description:
+    Decides whether to use an older version of bytestring along with bytestring-builder or just a newer version of bytestring.
+    .
+    This flag normally toggles automatically but you can use `-fbytestring-builder` or `-f-bytestring-builder` to explicitly change it.
+  default: False
+  manual: False
+
 library
         default-language:       Haskell2010
 
-        build-depends:          bytestring >= 0.10.2.0,
-                                base >= 4.4 && < 5, containers, array,
+        build-depends:          base >= 4.4 && < 5, containers, array,
                                 ghc-prim >= 0.2
 
         if !impl(ghc >= 8.0)
           build-depends:        fail == 4.9.*
+
+        if flag(bytestring-builder)
+          build-depends:        bytestring >= 0.9    && < 0.10.4,
+                                bytestring-builder >= 0.10.4 && < 1
+        else
+          build-depends:        bytestring >= 0.10.4 && < 1
 
         hs-source-dirs:         src
 
@@ -52,7 +65,7 @@ test-suite test-cereal
         type:                   exitcode-stdio-1.0
 
         build-depends:          base == 4.*,
-                                bytestring >= 0.10.8.1,
+                                bytestring >= 0.9,
                                 QuickCheck,
                                 test-framework,
                                 test-framework-quickcheck2,

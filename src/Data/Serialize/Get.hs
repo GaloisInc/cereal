@@ -59,10 +59,7 @@ module Data.Serialize.Get (
     -- ** ByteStrings
     , getByteString
     , getLazyByteString
-
-#if MIN_VERSION_bytestring(0,10,4)
     , getShortByteString
-#endif
 
     -- ** Big-endian reads
     , getWord16be
@@ -116,18 +113,13 @@ import qualified Data.ByteString          as B
 import qualified Data.ByteString.Internal as B
 import qualified Data.ByteString.Unsafe   as B
 import qualified Data.ByteString.Lazy     as L
+import qualified Data.ByteString.Short    as BS
 import qualified Data.IntMap              as IntMap
 import qualified Data.IntSet              as IntSet
 import qualified Data.Map                 as Map
 import qualified Data.Sequence            as Seq
 import qualified Data.Set                 as Set
 import qualified Data.Tree                as T
-
-
-#if MIN_VERSION_bytestring(0,10,4)
-import qualified Data.ByteString.Short as BS
-#endif
-
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base
@@ -511,12 +503,10 @@ getLazyByteString :: Int64 -> Get L.ByteString
 getLazyByteString n = f `fmap` getByteString (fromIntegral n)
   where f bs = L.fromChunks [bs]
 
-#if MIN_VERSION_bytestring(0,10,4)
 getShortByteString :: Int -> Get BS.ShortByteString
 getShortByteString n = do
   bs <- getBytes n
   return $! BS.toShort bs
-#endif
 
 
 ------------------------------------------------------------------------
