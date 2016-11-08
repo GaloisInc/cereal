@@ -457,8 +457,7 @@ lazyToStrictByteString = packChunks
 
 -- | Pack the chunks of a lazy bytestring into a single strict bytestring.
 packChunks :: L.ByteString -> S.ByteString
-packChunks lbs = do
-    S.unsafeCreate (fromIntegral $ L.length lbs) (copyChunks lbs)
+packChunks lbs = S.unsafeCreate (fromIntegral $ L.length lbs) (copyChunks lbs)
   where
     copyChunks !L.Empty                         !_pf = return ()
     copyChunks !(L.Chunk (S.PS fpbuf o l) lbs') !pf  = do
