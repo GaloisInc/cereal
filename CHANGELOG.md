@@ -1,4 +1,10 @@
 
+0.5.4.0
+=======
+
+* Allow building with older versions of GHC (thanks to Ryan Scott!)
+* Additional putters for ints (thanks to Andrew Martin!)
+
 0.5.2.0
 ======
 
