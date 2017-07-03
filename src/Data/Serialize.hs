@@ -254,7 +254,9 @@ instance Serialize Integer where
     put n = do
         putWord8 1
         put sign
-        put (unroll (abs n))         -- unroll the bytes
+        let len = ((nrBits n + 7) `div` 8)
+        putWord64be (fromIntegral len)
+        mapM_ put (unroll (abs n))         -- unroll the bytes
      where
         sign = fromIntegral (signum n) :: Word8
 
@@ -281,6 +283,17 @@ roll   = foldr unstep 0
   where
     unstep b a = a `shiftL` 8 .|. fromIntegral b
 
+nrBits :: (Ord a, Integral a) => a -> Int
+nrBits k =
+    let expMax = until (\e -> 2 ^ e > k) (* 2) 1
+        findNr :: Int -> Int -> Int
+        findNr lo hi
+            | mid == lo = hi
+            | 2 ^ mid <= k = findNr mid hi
+            | 2 ^ mid > k  = findNr lo mid
+         where mid = (lo + hi) `div` 2
+    in findNr (expMax `div` 2) expMax
+
 instance (Serialize a,Integral a) => Serialize (R.Ratio a) where
     put r = put (R.numerator r) >> put (R.denominator r)
     get = liftM2 (R.%) get get
@@ -299,7 +312,9 @@ instance Serialize Natural where
 
     put n = do
         putWord8 1
-        put (unroll (abs n))         -- unroll the bytes
+        let len = ((nrBits n + 7) `div` 8)
+        putWord64be (fromIntegral len)
+        mapM_ put (unroll (abs n))         -- unroll the bytes
 
     {-# INLINE get #-}
     get = do
