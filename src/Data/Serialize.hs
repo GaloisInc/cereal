@@ -254,7 +254,7 @@ instance Serialize Integer where
     put n = do
         putWord8 1
         put sign
-        let len = ((nrBits n + 7) `div` 8)
+        let len = ((nrBits (abs n) + 7) `div` 8)
         putWord64be (fromIntegral len)
         mapM_ put (unroll (abs n))         -- unroll the bytes
      where
@@ -312,7 +312,7 @@ instance Serialize Natural where
 
     put n = do
         putWord8 1
-        let len = ((nrBits n + 7) `div` 8)
+        let len = ((nrBits (abs n) + 7) `div` 8)
         putWord64be (fromIntegral len)
         mapM_ put (unroll (abs n))         -- unroll the bytes
 
