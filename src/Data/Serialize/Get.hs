@@ -709,7 +709,7 @@ getWord16host = getPtr (sizeOf (undefined :: Word16))
 getWord32host :: Get Word32
 getWord32host = getPtr  (sizeOf (undefined :: Word32))
 
--- | /O(1)./ Read a Word64 in native host order and host endianess.
+-- | /O(1)./ Read a Word64 in native host order and host endianness.
 getWord64host   :: Get Word64
 getWord64host = getPtr  (sizeOf (undefined :: Word64))
 
