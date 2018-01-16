@@ -178,6 +178,7 @@ instance Monad PutM where
 
 instance Sem.Semigroup (PutM ()) where
     (<>) = (*>)
+    {-# INLINE (<>) #-}
 
 instance Monoid (PutM ()) where
     mempty = pure ()
