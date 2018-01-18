@@ -106,6 +106,7 @@ import qualified Data.ByteString.Lazy   as L
 import qualified Data.IntMap            as IntMap
 import qualified Data.IntSet            as IntSet
 import qualified Data.Map               as Map
+import qualified Data.Semigroup         as Sem
 import qualified Data.Sequence          as Seq
 import qualified Data.Set               as Set
 import qualified Data.Tree              as T
@@ -174,6 +175,10 @@ instance Monad PutM where
 
     (>>) = (*>)
     {-# INLINE (>>) #-}
+
+instance Sem.Semigroup (PutM ()) where
+    (<>) = (*>)
+    {-# INLINE (<>) #-}
 
 instance Monoid (PutM ()) where
     mempty = pure ()
