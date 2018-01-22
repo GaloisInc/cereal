@@ -97,6 +97,9 @@ import qualified Data.ByteString.Short as BS
 
 import qualified Control.Applicative as A
 import Data.Array.Unboxed
+#if MIN_VERSION_base(4,9,0)
+import qualified Data.Semigroup as M
+#endif
 import qualified Data.Monoid as M
 import qualified Data.Foldable as F
 import Data.Word
@@ -175,12 +178,20 @@ instance Monad PutM where
     (>>) = (*>)
     {-# INLINE (>>) #-}
 
+#if MIN_VERSION_base(4,9,0)
+instance M.Semigroup (PutM ()) where
+    (<>) = (*>)
+    {-# INLINE (<>) #-}
+#endif
+
 instance Monoid (PutM ()) where
     mempty = pure ()
     {-# INLINE mempty #-}
 
+#if !(MIN_VERSION_base(4,11,0))
     mappend = (*>)
     {-# INLINE mappend #-}
+#endif
 
 tell :: Putter Builder
 tell b = Put $! PairS () b
