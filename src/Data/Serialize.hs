@@ -592,6 +592,16 @@ instance GSerializeGet U1 where
     gGet   = pure U1
     {-# INLINE gGet #-}
 
+-- | Always fails to serialize
+instance GSerializePut V1 where
+    gPut v = v `seq` error "GSerializePut.V1"
+    {-# INLINE gPut #-}
+
+-- | Always fails to deserialize
+instance GSerializeGet V1 where
+    gGet   = fail "GSerializeGet.V1"
+    {-# INLINE gGet #-}
+
 instance (GSerializePut a, GSerializePut b) => GSerializePut (a :*: b) where
     gPut (a :*: b) = gPut a *> gPut b
     {-# INLINE gPut #-}

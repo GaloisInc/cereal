@@ -1,3 +1,10 @@
+0.5.6.0
+=======
+* Added GSerializeGet and GSerializePut instances for V1
+
+0.5.5.0
+=======
+* Added Semigroup instances
 
 0.5.4.0
 =======
