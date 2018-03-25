@@ -57,16 +57,17 @@ import Data.Word
 import Foreign
 
 -- And needed for the instances:
-import qualified Data.ByteString      as B
-import qualified Data.ByteString.Lazy as L
-import qualified Data.Map             as Map
-import qualified Data.Monoid          as M
-import qualified Data.Set             as Set
-import qualified Data.IntMap          as IntMap
-import qualified Data.IntSet          as IntSet
-import qualified Data.Ratio           as R
-import qualified Data.Tree            as T
-import qualified Data.Sequence        as Seq
+import qualified Data.ByteString       as B
+import qualified Data.ByteString.Lazy  as L
+import qualified Data.ByteString.Short as S
+import qualified Data.Map              as Map
+import qualified Data.Monoid           as M
+import qualified Data.Set              as Set
+import qualified Data.IntMap           as IntMap
+import qualified Data.IntSet           as IntSet
+import qualified Data.Ratio            as R
+import qualified Data.Tree             as T
+import qualified Data.Sequence         as Seq
 
 import GHC.Generics
 
@@ -498,6 +499,11 @@ instance Serialize L.ByteString where
     put bs = do put (L.length bs :: Int64)
                 putLazyByteString bs
     get    = get >>= getLazyByteString
+
+instance Serialize S.ShortByteString where
+    put sbs = do put (S.length sbs)
+                 putShortByteString sbs
+    get     = get >>= getShortByteString
 
 
 ------------------------------------------------------------------------
