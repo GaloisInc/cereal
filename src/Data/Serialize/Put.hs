@@ -36,6 +36,7 @@ module Data.Serialize.Put (
     , runPutMLazy
     , putBuilder
     , execPut
+    , getPutM
 
     -- * Flushing the implicit parse state
     , flush
@@ -225,6 +226,10 @@ runPutLazy = toLazyByteString . sndS . unPut
 runPutMLazy :: PutM a -> (a, L.ByteString)
 runPutMLazy (Put (PairS f s)) = (f, toLazyByteString s)
 {-# INLINE runPutMLazy #-}
+
+getPutM :: PutM a -> (a, Builder)
+getPutM (Put (PairS f s)) = (f, s)
+{-# INLINE getPutM #-}
 
 ------------------------------------------------------------------------
 
