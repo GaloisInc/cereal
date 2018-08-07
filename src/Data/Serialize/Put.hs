@@ -34,6 +34,7 @@ module Data.Serialize.Put (
     , runPutM
     , runPutLazy
     , runPutMLazy
+    , runPutMBuilder
     , putBuilder
     , execPut
 
@@ -225,6 +226,11 @@ runPutLazy = toLazyByteString . sndS . unPut
 runPutMLazy :: PutM a -> (a, L.ByteString)
 runPutMLazy (Put (PairS f s)) = (f, toLazyByteString s)
 {-# INLINE runPutMLazy #-}
+
+-- | Run the 'Put' monad and get the result and underlying 'Builder'
+runPutMBuilder :: PutM a -> (a, Builder)
+runPutMBuilder (Put (PairS f s)) = (f, s)
+{-# INLINE runPutMBuilder #-}
 
 ------------------------------------------------------------------------
 

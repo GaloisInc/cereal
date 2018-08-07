@@ -1,3 +1,7 @@
+0.5.7.0
+=======
+* Added `runPutMBuilder`
+
 0.5.6.0
 =======
 * Added GSerializeGet and GSerializePut instances for V1
