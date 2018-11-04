@@ -30,8 +30,8 @@ roundTrip p g a = res == Right a
 
 -- | Did a call to 'quickCheckResult' succeed?
 isSuccess :: QC.Result -> Bool
-isSuccess (Success _ _ _) = True
-isSuccess _ = False
+isSuccess Success{} = True
+isSuccess _         = False
 
 tests :: Test
 tests  = testGroup "Round Trip"
