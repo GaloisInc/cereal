@@ -1,3 +1,7 @@
+0.5.8.0
+=======
+* Added ShortByteString instances
+
 0.5.7.0
 =======
 * Added `runPutMBuilder`
