@@ -226,8 +226,10 @@ instance Monad Get where
     (>>) = (A.*>)
     {-# INLINE (>>) #-}
 
+#if !MIN_VERSION_base(4,13,0)
     fail     = Fail.fail
     {-# INLINE fail #-}
+#endif
 
 instance Fail.MonadFail Get where
     fail     = failDesc
