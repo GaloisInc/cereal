@@ -1,3 +1,7 @@
+0.5.8.1
+=======
+* GHC 8.8.1 compatibility
+
 0.5.8.0
 =======
 * Added ShortByteString instances
