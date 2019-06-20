@@ -300,7 +300,7 @@ runGetPartial m = runGetChunk m Nothing
 {-# INLINE runGetPartial #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
--- ByteString. Additional to the result of get it returns the number of
+-- ByteString, starting at the specified offset. Additional to the result of get it returns the number of
 -- consumed bytes and the rest of the input.
 runGetState :: Get a -> B.ByteString -> Int
             -> Either String (a, B.ByteString)
@@ -310,7 +310,7 @@ runGetState m str off = case runGetState' m str off of
 {-# INLINE runGetState #-}
 
 -- | Run the Get monad applies a 'get'-based parser on the input
--- ByteString. Additional to the result of get it returns the number of
+-- ByteString, starting at the specified offset. Additional to the result of get it returns the number of
 -- consumed bytes and the rest of the input, even in the event of a failure.
 runGetState' :: Get a -> B.ByteString -> Int
              -> (Either String a, B.ByteString)
