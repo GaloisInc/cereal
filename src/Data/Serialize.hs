@@ -289,9 +289,9 @@ nrBits k =
     let expMax = until (\e -> 2 ^ e > k) (* 2) 1
         findNr :: Int -> Int -> Int
         findNr lo hi
-            | mid == lo = hi
+            | mid == lo    = hi
             | 2 ^ mid <= k = findNr mid hi
-            | 2 ^ mid > k  = findNr lo mid
+            | otherwise    = findNr lo mid
          where mid = (lo + hi) `div` 2
     in findNr (expMax `div` 2) expMax
 
