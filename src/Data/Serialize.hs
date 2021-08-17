@@ -76,6 +76,7 @@ import Control.Applicative ((*>),(<*>),(<$>),pure)
 #endif
 
 #if MIN_VERSION_base(4,8,0)
+import Data.Void
 import Numeric.Natural
 #endif
 
@@ -140,6 +141,12 @@ expect x = get >>= \y -> if x == y then return x else mzero
 instance Serialize () where
     put ()  = return ()
     get     = return ()
+
+#if MIN_VERSION_base(4,8,0)
+instance Serialize Void where
+    put = absurd
+    get = fail "attempt to deserialise Void"
+#endif
 
 {-# INLINE boolToWord8 #-}
 boolToWord8 :: Bool -> Word8

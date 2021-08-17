@@ -1,3 +1,8 @@
+Unreleased
+==========
+
+* Add `instance Serialize Void`
+
 0.5.8.1
 =======
 * GHC 8.8.1 compatibility
