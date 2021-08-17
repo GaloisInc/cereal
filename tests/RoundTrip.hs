@@ -2,13 +2,13 @@
 
 --------------------------------------------------------------------------------
 -- |
--- Module      : 
+-- Module      :
 -- Copyright   : (c) Galois, Inc, 2009
 -- License     : BSD3
 --
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
--- Stability   : 
--- Portability : 
+-- Stability   :
+-- Portability :
 --
 module RoundTrip where
 
