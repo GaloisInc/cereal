@@ -87,6 +87,9 @@ module Data.Serialize.Get (
     -- ** Containers
     , getTwoOf
     , getListOf
+#if MIN_VERSION_base(4,9,0)
+    , getNonEmptyListOf
+#endif
     , getIArrayOf
     , getTreeOf
     , getSeqOf
@@ -121,6 +124,10 @@ import qualified Data.Map                 as Map
 import qualified Data.Sequence            as Seq
 import qualified Data.Set                 as Set
 import qualified Data.Tree                as T
+
+#if MIN_VERSION_base(4,9,0)
+import qualified Data.List.NonEmpty as NE
+#endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base
@@ -762,6 +769,20 @@ getListOf m = go [] =<< getWord64be
   go as 0 = return $! reverse as
   go as i = do x <- m
                x `seq` go (x:as) (i - 1)
+
+#if MIN_VERSION_base(4,9,0)
+-- | Get a non-empty list in the following format:
+--   Word64 (big endian format)
+--   element 1
+--   ...
+--   element n
+getNonEmptyListOf :: Get a -> Get (NE.NonEmpty a)
+getNonEmptyListOf m = do
+  list <- getListOf m
+  case NE.nonEmpty list of
+    Nothing -> fail "getNonEmptyListOf: empty list"
+    Just neList -> pure neList
+#endif
 
 -- | Get an IArray in the following format:
 --   index (lower bound)

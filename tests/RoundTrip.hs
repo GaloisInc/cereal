@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
 
 --------------------------------------------------------------------------------
@@ -23,6 +24,9 @@ import Test.QuickCheck as QC
 import Test.Framework (Test(),testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
+#if MIN_VERSION_base(4,9,0)
+import qualified Data.List.NonEmpty as NE
+#endif
 
 roundTrip :: Eq a => Putter a -> Get a -> a -> Bool
 roundTrip p g a = res == Right a
@@ -55,6 +59,12 @@ tests  = testGroup "Round Trip"
     $ roundTrip (putTwoOf putWord8 putWord8) (getTwoOf getWord8 getWord8)
   , testProperty "[Word8] Round Trip"
     $ roundTrip (putListOf putWord8) (getListOf getWord8)
+#if MIN_VERSION_base(4,9,0)
+  , testProperty "NonEmpty Word8 Round Trip"
+    $ roundTrip
+        (putNonEmptyListOf putWord8 . NE.fromList . QC.getNonEmpty)
+        (QC.NonEmpty . NE.toList <$> getNonEmptyListOf getWord8)
+#endif
   , testProperty "Maybe Word8 Round Trip"
     $ roundTrip (putMaybeOf putWord8) (getMaybeOf getWord8)
   , testProperty "Either Word8 Word16be Round Trip "

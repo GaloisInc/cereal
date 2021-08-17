@@ -80,6 +80,10 @@ import Data.Void
 import Numeric.Natural
 #endif
 
+#if MIN_VERSION_base(4,9,0)
+import Data.List.NonEmpty (NonEmpty)
+#endif
+
 ------------------------------------------------------------------------
 
 
@@ -485,6 +489,12 @@ instance Serialize a => Serialize (M.Last a) where
 instance Serialize a => Serialize [a] where
     put = putListOf put
     get = getListOf get
+
+#if MIN_VERSION_base(4,9,0)
+instance Serialize a => Serialize (NonEmpty a) where
+    put = putNonEmptyListOf put
+    get = getNonEmptyListOf get
+#endif
 
 instance (Serialize a) => Serialize (Maybe a) where
     put = putMaybeOf put

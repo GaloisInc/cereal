@@ -77,6 +77,9 @@ module Data.Serialize.Put (
     -- * Containers
     , putTwoOf
     , putListOf
+#if MIN_VERSION_base(4,9,0)
+    , putNonEmptyListOf
+#endif
     , putIArrayOf
     , putSeqOf
     , putTreeOf
@@ -113,6 +116,10 @@ import qualified Data.Map               as Map
 import qualified Data.Sequence          as Seq
 import qualified Data.Set               as Set
 import qualified Data.Tree              as T
+
+#if MIN_VERSION_base(4,9,0)
+import qualified Data.List.NonEmpty as NE
+#endif
 
 #if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative
@@ -405,6 +412,12 @@ putListOf pa = \l -> do
   putWord64be (fromIntegral (length l))
   mapM_ pa l
 {-# INLINE putListOf #-}
+
+#if MIN_VERSION_base(4,9,0)
+putNonEmptyListOf :: Putter a -> Putter (NE.NonEmpty a)
+putNonEmptyListOf pa = putListOf pa . NE.toList
+{-# INLINE putNonEmptyListOf #-}
+#endif
 
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
 putIArrayOf pix pe a = do
