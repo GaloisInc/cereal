@@ -74,5 +74,6 @@ test-suite test-cereal
         main-is:                Main.hs
         other-modules:          RoundTrip
                                 GetTests
+                                BytesRead
 
         hs-source-dirs:         tests
