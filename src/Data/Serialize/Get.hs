@@ -741,7 +741,11 @@ foreign import ccall unsafe "stg_uncheckedShiftL64"
 #endif
 
 #else
+#if __GLASGOW_HASKELL__ >= 904
+shiftl_w64 (W64# w) (I# i) = W64# (wordToWord64# (word64ToWord# w `uncheckedShiftL#` i))
+#else
 shiftl_w64 (W64# w) (I# i) = W64# (w `uncheckedShiftL#` i)
+#endif
 #endif
 
 #else
