@@ -741,7 +741,11 @@ foreign import ccall unsafe "stg_uncheckedShiftL64"
 #endif
 
 #else
+#if MIN_VERSION_base(4,17,0)
+shiftl_w64 (W64# w) (I# i) = W64# (w `uncheckedShiftL64#` i)
+#else
 shiftl_w64 (W64# w) (I# i) = W64# (w `uncheckedShiftL#` i)
+#endif
 #endif
 
 #else
