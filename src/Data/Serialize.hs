@@ -297,7 +297,10 @@ nrBits k =
 
 instance (Serialize a,Integral a) => Serialize (R.Ratio a) where
     put r = put (R.numerator r) >> put (R.denominator r)
-    get = liftM2 (R.%) get get
+    get = do n <- get
+             d <- get
+             when (d == 0) (fail "Invalid denominator in Ratio encoding")
+             return (n R.% d)
 
 #if MIN_VERSION_base(4,8,0)
 -- Fixed-size type for a subset of Natural
