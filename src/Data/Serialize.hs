@@ -76,7 +76,12 @@ import Control.Applicative ((*>),(<*>),(<$>),pure)
 #endif
 
 #if MIN_VERSION_base(4,8,0)
+import Data.Void
 import Numeric.Natural
+#endif
+
+#if MIN_VERSION_base(4,9,0)
+import Data.List.NonEmpty (NonEmpty)
 #endif
 
 ------------------------------------------------------------------------
@@ -140,6 +145,12 @@ expect x = get >>= \y -> if x == y then return x else mzero
 instance Serialize () where
     put ()  = return ()
     get     = return ()
+
+#if MIN_VERSION_base(4,8,0)
+instance Serialize Void where
+    put = absurd
+    get = fail "attempt to deserialise Void"
+#endif
 
 {-# INLINE boolToWord8 #-}
 boolToWord8 :: Bool -> Word8
@@ -481,6 +492,12 @@ instance Serialize a => Serialize (M.Last a) where
 instance Serialize a => Serialize [a] where
     put = putListOf put
     get = getListOf get
+
+#if MIN_VERSION_base(4,9,0)
+instance Serialize a => Serialize (NonEmpty a) where
+    put = putNonEmptyListOf put
+    get = getNonEmptyListOf get
+#endif
 
 instance (Serialize a) => Serialize (Maybe a) where
     put = putMaybeOf put
