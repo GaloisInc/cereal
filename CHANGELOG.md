@@ -4,6 +4,10 @@ Unreleased
 * Add `instance Serialize a => Serialize (NonEmpty a)`
 * Add `instance Serialize Void`
 
+0.5.8.3
+=======
+* GHC 9.4.1 compatibility
+
 0.5.8.1
 =======
 * GHC 8.8.1 compatibility
