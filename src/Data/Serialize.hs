@@ -1,5 +1,9 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures
            , TypeOperators
@@ -52,6 +56,8 @@ import Control.Monad
 import Data.Array.Unboxed
 import Data.ByteString (ByteString)
 import Data.Char    (chr,ord)
+import Data.Functor.Const (Const(Const))
+import Data.Functor.Identity (Identity(Identity))
 import Data.List    (unfoldr)
 import Data.Word
 import Foreign
@@ -386,6 +392,7 @@ instance Serialize Char where
             Left err ->
                 fail err
 
+
 ------------------------------------------------------------------------
 -- Instances for the first few tuples
 
@@ -443,6 +450,12 @@ instance (Serialize a, Serialize b, Serialize c, Serialize d, Serialize e,
     put (a,b,c,d,e,f,g,h,i,j) = put (a,(b,c,d,e,f,g,h,i,j))
     get                       = do (a,(b,c,d,e,f,g,h,i,j)) <- get
                                    return (a,b,c,d,e,f,g,h,i,j)
+
+------------------------------------------------------------------------
+-- Identity newtype wrappers
+
+deriving newtype instance Serialize a => Serialize (Identity a)
+deriving newtype instance Serialize a => Serialize (Const a (b :: k))
 
 ------------------------------------------------------------------------
 -- Monoid newtype wrappers
