@@ -443,7 +443,7 @@ lookAhead :: Get a -> Get a
 lookAhead ga = Get $ \ s0 b0 m0 w0 kf ks ->
   -- the new continuation extends the old input with the new buffered bytes, and
   -- appends the new buffer to the old one, if there was one.
-  let ks' _ b1 = ks (s0 `B.append` bufferBytes b1) (b0 `append` b1)
+  let ks' _ b1 m1 _ = ks (s0 `B.append` bufferBytes b1) (b0 `append` b1) m1 w0
       kf' _ b1 = kf s0 (b0 `append` b1)
    in unGet ga s0 emptyBuffer m0 w0 kf' ks'
 
