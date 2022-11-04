@@ -1,5 +1,5 @@
 name:                   cereal
-version:                0.5.8.3
+version:                0.5.8.4
 license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
@@ -13,7 +13,7 @@ build-type:             Simple
 cabal-version:          >= 1.10
 synopsis:               A binary serialization library
 homepage:               https://github.com/GaloisInc/cereal
-tested-with:            GHC == 7.2.2, GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2
+tested-with:            GHC == 7.2.2, GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2, GHC == 8.8.4
 
 description:
   A binary serialization library, similar to binary, that introduces an isolate
