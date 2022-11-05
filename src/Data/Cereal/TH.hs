@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Data.Cereal.TH where
 
 import Data.Serialize
@@ -8,6 +9,7 @@ import Language.Haskell.TH.Datatype
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
+import Data.Foldable
 import Data.Traversable
 import Control.Monad
 import Data.Functor
@@ -50,9 +52,21 @@ makeCereal name = do
                   specificConstructorGetsBindingsAndNames <&>
                     (\(_, binding, constrName) ->
                       match (litP (stringL constrName)) (normalB (varE binding)) [])
+                catchAll :: Q Match
+                catchAll = do
+                  xName <- newName "x"
+                  match
+                    (varP xName)
+                    (normalB
+                      (appE
+                        (varE 'fail)
+                        (infixE
+                          (Just (litE (stringL "Unexpected Tag: ")))
+                          (varE '(<>))
+                          (Just (appE (varE 'show) (varE xName)))))) []
                 branchBasedOnConstr =
                   noBindS $
-                  caseE (varE constrNameBinding) matches
+                  caseE (varE constrNameBinding) (matches <> [catchAll])
                 body = normalB $ doE [bindCnstrName, branchBasedOnConstr]
                 declrs = specificConstructorGetsBindingsAndNames <&> (\(d, _, _) -> pure d)
               valD (varP 'get) body declrs

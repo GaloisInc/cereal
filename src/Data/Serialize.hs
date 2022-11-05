@@ -52,8 +52,11 @@ import Control.Monad
 import Data.Array.Unboxed
 import Data.ByteString (ByteString)
 import Data.Char    (chr,ord)
+import Data.Hashable (Hashable)
 import Data.List    (unfoldr)
+import Data.Scientific (Scientific, floatingOrInteger, fromFloatDigits)
 import Data.Text    (Text)
+import Data.Vector  (Vector)
 import qualified Data.Text.Encoding as Enc
 import Data.Word
 import Foreign
@@ -63,6 +66,7 @@ import qualified Data.ByteString       as B
 import qualified Data.ByteString.Lazy  as L
 import qualified Data.ByteString.Short as S
 import qualified Data.Map              as Map
+import qualified Data.HashMap.Strict   as HashMap
 import qualified Data.Monoid           as M
 import qualified Data.Set              as Set
 import qualified Data.IntMap           as IntMap
@@ -722,3 +726,22 @@ instance Serialize Text where
   get = do
     len <- fromEnum <$> getWord32be
     Enc.decodeUtf8 <$> getBytes len
+
+instance (Eq k, Hashable k, Serialize k, Serialize e) => Serialize (HashMap.HashMap k e) where
+  put = putHashMapOf put put
+  get = getHashMapOf get get
+
+instance Serialize a => Serialize (Vector a) where
+  put =  putVectorOf put
+  get = getVectorOf get
+
+instance Serialize Scientific where
+  put x = do
+    put (floatingOrInteger x :: Either Double Int)
+  get = do
+    x <- get :: Get (Either Double Int)
+    pure $
+      case x of
+        Left f -> fromFloatDigits f
+        Right i -> fromIntegral i
+
