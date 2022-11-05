@@ -45,6 +45,7 @@ library
                                 unordered-containers,
                                 hashable,
                                 scientific,
+                                time,
                                 vector
 
 
@@ -80,6 +81,7 @@ test-suite test-cereal
                                 QuickCheck,
                                 test-framework,
                                 test-framework-quickcheck2,
+                                time,
                                 cereal
 
         main-is:                Main.hs

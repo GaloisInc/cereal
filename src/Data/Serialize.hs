@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures
@@ -52,9 +53,13 @@ import Control.Monad
 import Data.Array.Unboxed
 import Data.ByteString (ByteString)
 import Data.Char    (chr,ord)
+import Data.Fixed   (Fixed(..))
 import Data.Hashable (Hashable)
 import Data.List    (unfoldr)
 import Data.Scientific (Scientific, floatingOrInteger, fromFloatDigits)
+import Data.Time
+import Data.Time.LocalTime
+import Data.Time.Calendar
 import Data.Text    (Text)
 import Data.Vector  (Vector)
 import qualified Data.Text.Encoding as Enc
@@ -745,3 +750,22 @@ instance Serialize Scientific where
         Left f -> fromFloatDigits f
         Right i -> fromIntegral i
 
+instance Serialize LocalTime where
+  put (LocalTime d tod) = do
+    put $ toModifiedJulianDay d
+    putByteString "D"
+    putInt8 $ fromIntegral $ todHour tod
+    putByteString "H"
+    putInt8 $ fromIntegral $ todMin tod
+    putByteString "M"
+    let MkFixed a = todSec tod
+    put a
+  get = do
+    day <- get
+    getBytes 1
+    hour <- fromEnum <$> getInt8
+    getBytes 1
+    min <- fromEnum <$> getInt8
+    getBytes 1
+    sec <- MkFixed <$> get
+    pure $ LocalTime (ModifiedJulianDay day) (TimeOfDay hour min sec)
