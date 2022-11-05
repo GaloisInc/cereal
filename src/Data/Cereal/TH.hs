@@ -1,10 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Data.Cereal.TH where
 
 import Data.Serialize
+import Prelude
+import Data.Maybe (isJust)
 import Language.Haskell.TH.Datatype
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
@@ -15,8 +16,17 @@ import Control.Monad
 import Data.Functor
 import Data.Text (Text)
 
+makeCerealCustom :: Name -> Name -> Q [Dec]
+makeCerealCustom name hv = makeCerealInternal (Just hv) name
+
+makeCerealIdentity :: Name -> Q [Dec]
+makeCerealIdentity = makeCerealInternal (Just $ mkName "Identity")
+
 makeCereal :: Name -> Q [Dec]
-makeCereal name = do
+makeCereal = makeCerealInternal Nothing
+
+makeCerealInternal :: Maybe Name -> Name -> Q [Dec]
+makeCerealInternal higherKindType name = do
   info <- reifyDatatype name
   case info of
     DatatypeInfo { datatypeName
@@ -27,7 +37,9 @@ makeCereal name = do
         constrNameStr constructor =
           case (constructorName constructor) of
             Name (OccName occName) _ -> occName
-        instanceType = AppT (ConT ''Serialize) $ ConT datatypeName
+        instanceType = case higherKindType of
+                        Just v -> AppT (ConT ''Serialize) $ AppT (ConT datatypeName) (ConT v)
+                        _ -> AppT (ConT ''Serialize) $ ConT datatypeName
         funcDecl =
           [ getDecl, putDecl ]
         putDecl = funD 'put (datatypeCons <&> putClause)
