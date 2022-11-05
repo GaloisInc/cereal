@@ -37,7 +37,10 @@ library
         default-language:       Haskell2010
 
         build-depends:          base >= 4.4 && < 5, containers, array,
-                                ghc-prim >= 0.2
+                                ghc-prim >= 0.2,
+                                template-haskell,
+                                th-abstraction,
+                                text
 
         if !impl(ghc >= 8.0)
           build-depends:        fail == 4.9.*
@@ -50,7 +53,8 @@ library
 
         hs-source-dirs:         src
 
-        exposed-modules:        Data.Serialize,
+        exposed-modules:        Data.Cereal.TH,
+                                Data.Serialize,
                                 Data.Serialize.Put,
                                 Data.Serialize.Get,
                                 Data.Serialize.IEEE754
