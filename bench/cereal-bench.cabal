@@ -26,4 +26,8 @@ executable cereal-bench
                      , criterion
                      , binary     >= 0.5
                      , text
+                     , unordered-containers
+                     , vector
+                     , hashable
+                     , scientific
                      , fail
