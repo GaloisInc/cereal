@@ -20,6 +20,7 @@ import Data.Serialize.IEEE754
 import Data.Word (Word8,Word16,Word32,Word64)
 import System.Exit (ExitCode(..), exitSuccess, exitWith)
 import Test.QuickCheck as QC
+import Data.Time
 
 import Test.Framework (Test(),testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -66,3 +67,7 @@ tests  = testGroup "Round Trip"
     $ roundTrip (putEitherOf putWord8 putWord16be)
                 (getEitherOf getWord8 getWord16be)
   ]
+
+timeTests :: LocalTime -> Test
+timeTests time = testGroup "simple time tests"
+  [ testProperty "Local Time"  $ roundTrip put get time ]
