@@ -1,14 +1,15 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 --------------------------------------------------------------------------------
 -- |
--- Module      : 
+-- Module      :
 -- Copyright   : (c) Galois, Inc, 2009
 -- License     : BSD3
 --
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
--- Stability   : 
--- Portability : 
+-- Stability   :
+-- Portability :
 --
 module RoundTrip where
 
@@ -57,6 +58,10 @@ tests  = testGroup "Round Trip"
     $ roundTrip (putListOf putWord8) (getListOf getWord8)
   , testProperty "Maybe Word8 Round Trip"
     $ roundTrip (putMaybeOf putWord8) (getMaybeOf getWord8)
+  , testProperty "Maybe without data"
+    $ runGet (getMaybeOf' getWord8) "" == Right Nothing
+  , testProperty "Maybe' Word8 Round Trip"
+    $ roundTrip (putMaybeOf putWord8) (getMaybeOf' getWord8)
   , testProperty "Either Word8 Word16be Round Trip "
     $ roundTrip (putEitherOf putWord8 putWord16be)
                 (getEitherOf getWord8 getWord16be)

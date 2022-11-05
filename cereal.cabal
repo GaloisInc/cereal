@@ -1,5 +1,5 @@
 name:                   cereal
-version:                0.5.8.3
+version:                0.5.8.4
 license:                BSD3
 license-file:           LICENSE
 author:                 Lennart Kolmodin <kolmodin@dtek.chalmers.se>,
@@ -13,7 +13,7 @@ build-type:             Simple
 cabal-version:          >= 1.10
 synopsis:               A binary serialization library
 homepage:               https://github.com/GaloisInc/cereal
-tested-with:            GHC == 7.2.2, GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2
+tested-with:            GHC == 7.2.2, GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2, GHC == 8.8.4
 
 description:
   A binary serialization library, similar to binary, that introduces an isolate
@@ -37,7 +37,10 @@ library
         default-language:       Haskell2010
 
         build-depends:          base >= 4.4 && < 5, containers, array,
-                                ghc-prim >= 0.2
+                                ghc-prim >= 0.2,
+                                template-haskell,
+                                th-abstraction,
+                                text
 
         if !impl(ghc >= 8.0)
           build-depends:        fail == 4.9.*
@@ -50,7 +53,8 @@ library
 
         hs-source-dirs:         src
 
-        exposed-modules:        Data.Serialize,
+        exposed-modules:        Data.Cereal.TH,
+                                Data.Serialize,
                                 Data.Serialize.Put,
                                 Data.Serialize.Get,
                                 Data.Serialize.IEEE754

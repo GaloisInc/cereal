@@ -53,6 +53,8 @@ import Data.Array.Unboxed
 import Data.ByteString (ByteString)
 import Data.Char    (chr,ord)
 import Data.List    (unfoldr)
+import Data.Text    (Text)
+import qualified Data.Text.Encoding as Enc
 import Data.Word
 import Foreign
 
@@ -484,7 +486,7 @@ instance Serialize a => Serialize [a] where
 
 instance (Serialize a) => Serialize (Maybe a) where
     put = putMaybeOf put
-    get = getMaybeOf get
+    get = getMaybeOf' get -- use the `'` version of maybe to handle the end of buffer usecase.
 
 instance (Serialize a, Serialize b) => Serialize (Either a b) where
     put = putEitherOf put put
@@ -710,3 +712,13 @@ instance (SumSize a, SumSize b) => SumSize (a :+: b) where
 
 instance SumSize (C1 c a) where
     sumSize = Tagged 1
+
+------------------ Instances Added for Juspay usecase ------------------------------------------
+instance Serialize Text where
+  {-# INLINE put #-}
+  put t =
+    putNested (putWord32be . toEnum) (putByteString (Enc.encodeUtf8 t))
+  {-# INLINE get #-}
+  get = do
+    len <- fromEnum <$> getWord32be
+    Enc.decodeUtf8 <$> getBytes len

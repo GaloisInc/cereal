@@ -95,6 +95,7 @@ module Data.Serialize.Get (
     , getSetOf
     , getIntSetOf
     , getMaybeOf
+    , getMaybeOf'
     , getEitherOf
     , getNested
   ) where
@@ -824,6 +825,17 @@ getMaybeOf m = do
   case tag of
     0 -> return Nothing
     _ -> Just `fmap` m
+
+-- | Read in a Maybe in the following format:
+-- First check if the buffer is empty,
+--  if so then return Nothing
+--  else invoke getMaybeOf
+getMaybeOf' :: Get a -> Get (Maybe a)
+getMaybeOf' m = do
+  eob <- isEmpty
+  if eob
+     then return Nothing
+     else getMaybeOf m
 
 -- | Read an Either, in the following format:
 --   Word8 (0 for Left, anything else for Right)
