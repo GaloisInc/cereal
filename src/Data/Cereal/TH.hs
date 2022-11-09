@@ -72,10 +72,19 @@ makeCerealInternal higherKindType name = do
                     (normalB
                       (appE
                         (varE 'fail)
-                        (infixE
-                          (Just (litE (stringL "Unexpected Tag: ")))
+                        (infixApp
+                          (infixE
+                            (Just (litE (stringL "Unexpected Tag: ")))
+                            (varE '(<>))
+                            (Just (appE (varE 'show) (varE xName))))
                           (varE '(<>))
-                          (Just (appE (varE 'show) (varE xName)))))) []
+                          (infixE
+                            (Just (litE (stringL " for type: ")))
+                            (varE '(<>))
+                            (Just (appE (varE 'show) (litE (stringL $ nameBase name)))))
+                        )
+                      )
+                    ) []
                 branchBasedOnConstr =
                   noBindS $
                   caseE (varE constrNameBinding) (matches <> [catchAll])
