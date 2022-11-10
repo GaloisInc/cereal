@@ -82,6 +82,8 @@ test-suite test-cereal
                                 test-framework,
                                 test-framework-quickcheck2,
                                 time,
+                                aeson,
+                                unordered-containers,
                                 cereal
 
         main-is:                Main.hs

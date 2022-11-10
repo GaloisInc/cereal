@@ -79,7 +79,9 @@ makeCerealInternal higherKindType name = do
                 branchBasedOnConstr =
                   noBindS $
                   caseE (varE constrNameBinding) (matches <> [catchAll])
-                body = normalB $ doE [bindCnstrName, branchBasedOnConstr]
+                bytesToRead = mkName "bytesToRead"
+                lenRead = bindS (varP bytesToRead) (varE 'getWord32be)
+                body = normalB $ doE [lenRead, noBindS $ appE (appE (varE 'isolate) (appE (varE 'fromEnum) (varE bytesToRead))) (doE [bindCnstrName, branchBasedOnConstr])]
                 declrs = specificConstructorGetsBindingsAndNames <&> (\(d, _, _) -> pure d)
               valD (varP 'get) body declrs
           in getBody
@@ -116,6 +118,6 @@ makeCerealInternal higherKindType name = do
               attrBindingNames <&>
                 (\name -> noBindS $ appE (varE 'put) (varE name))
           in
-            normalB $ doE (putConstr : putStmts)
+            normalB $ appE (appE (varE 'putNested) (uInfixE (varE 'putWord32be) (varE '(.)) (varE 'toEnum))) (doE (putConstr : putStmts))
       pure <$>
         instanceD (pure []) (pure instanceType) (funcDecl)
