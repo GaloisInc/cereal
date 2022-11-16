@@ -13,10 +13,10 @@ import Data.Serialize
 
 main :: IO ()
 main  = do
-  time <- utcToLocalTime <$> getCurrentTimeZone <*> getCurrentTime
-  print $ runPut $ put time
+  ltime <- utcToLocalTime <$> getCurrentTimeZone <*> getCurrentTime
+  utime <- getCurrentTime
   defaultMain
     [ GetTests.tests
     , RoundTrip.tests
-    , (RoundTrip.timeTests time)
+    , (RoundTrip.timeTests ltime utime)
     ]

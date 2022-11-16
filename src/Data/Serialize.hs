@@ -769,3 +769,11 @@ instance Serialize LocalTime where
     getBytes 1
     sec <- MkFixed <$> get
     pure $ LocalTime (ModifiedJulianDay day) (TimeOfDay hour min sec)
+instance Serialize UTCTime where
+  put (UTCTime d tod) = do
+    put $ toModifiedJulianDay d
+    put $ diffTimeToPicoseconds tod
+  get = do
+    day <- get
+    d <- get
+    pure $ UTCTime (ModifiedJulianDay day) (picosecondsToDiffTime d)

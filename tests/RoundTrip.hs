@@ -75,6 +75,8 @@ tests  = testGroup "Round Trip"
     $ roundTrip put get (A.Object $ HM.insert "abc" (A.String "abc") HM.empty)
   ]
 
-timeTests :: LocalTime -> Test
-timeTests time = testGroup "simple time tests"
-  [ testProperty "Local Time"  $ roundTrip put get time ]
+timeTests :: LocalTime -> UTCTime -> Test
+timeTests ltime utime = testGroup "simple time tests"
+  [ testProperty "Local Time"  $ roundTrip put get ltime
+  , testProperty "UTC Time" $ roundTrip put get utime
+  ]
