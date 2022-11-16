@@ -87,14 +87,17 @@ module Data.Serialize.Get (
     -- ** Containers
     , getTwoOf
     , getListOf
+    , getVectorOf
     , getIArrayOf
     , getTreeOf
     , getSeqOf
     , getMapOf
     , getIntMapOf
+    , getHashMapOf
     , getSetOf
     , getIntSetOf
     , getMaybeOf
+    , getMaybeOf'
     , getEitherOf
     , getNested
   ) where
@@ -104,9 +107,11 @@ import qualified Control.Monad as M
 import Control.Monad (unless)
 import qualified Control.Monad.Fail as Fail
 import Data.Array.IArray (IArray,listArray)
+import Data.Hashable (Hashable)
 import Data.Ix (Ix)
 import Data.List (intercalate)
 import Data.Maybe (isNothing,fromMaybe)
+import qualified Data.Vector as Vector
 import Foreign
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -116,6 +121,7 @@ import qualified Data.ByteString.Unsafe   as B
 import qualified Data.ByteString.Lazy     as L
 import qualified Data.ByteString.Short    as BS
 import qualified Data.IntMap              as IntMap
+import qualified Data.HashMap.Strict      as HashMap
 import qualified Data.IntSet              as IntSet
 import qualified Data.Map                 as Map
 import qualified Data.Sequence            as Seq
@@ -772,6 +778,17 @@ getListOf m = go [] =<< getWord64be
   go as i = do x <- m
                x `seq` go (x:as) (i - 1)
 
+-- | Get a vector in the following format:
+--   Word64 (big endian format)
+--   element 1
+--   ...
+--   element n
+getVectorOf :: Get a -> Get (Vector.Vector a)
+getVectorOf m = go mempty =<< getWord64be
+  where
+  go as 0 = return $! Vector.reverse as
+  go as i = do x <- m
+               x `seq` go (Vector.cons x as) (i - 1)
 -- | Get an IArray in the following format:
 --   index (lower bound)
 --   index (upper bound)
@@ -807,6 +824,10 @@ getMapOf k m = Map.fromList `fmap` getListOf (getTwoOf k m)
 getIntMapOf :: Get Int -> Get a -> Get (IntMap.IntMap a)
 getIntMapOf i m = IntMap.fromList `fmap` getListOf (getTwoOf i m)
 
+-- | Read as a list of pairs of key and element.
+getHashMapOf :: Eq k => Hashable k => Get k -> Get a -> Get (HashMap.HashMap k a)
+getHashMapOf k m = HashMap.fromList `fmap` getListOf (getTwoOf k m)
+
 -- | Read as a list of elements.
 getSetOf :: Ord a => Get a -> Get (Set.Set a)
 getSetOf m = Set.fromList `fmap` getListOf m
@@ -824,6 +845,17 @@ getMaybeOf m = do
   case tag of
     0 -> return Nothing
     _ -> Just `fmap` m
+
+-- | Read in a Maybe in the following format:
+-- First check if the buffer is empty,
+--  if so then return Nothing
+--  else invoke getMaybeOf
+getMaybeOf' :: Get a -> Get (Maybe a)
+getMaybeOf' m = do
+  eob <- isEmpty
+  if eob
+     then return Nothing
+     else getMaybeOf m
 
 -- | Read an Either, in the following format:
 --   Word8 (0 for Left, anything else for Right)

@@ -77,11 +77,13 @@ module Data.Serialize.Put (
     -- * Containers
     , putTwoOf
     , putListOf
+    , putVectorOf
     , putIArrayOf
     , putSeqOf
     , putTreeOf
     , putMapOf
     , putIntMapOf
+    , putHashMapOf
     , putSetOf
     , putIntSetOf
     , putMaybeOf
@@ -108,11 +110,14 @@ import Data.Int
 import qualified Data.ByteString        as S
 import qualified Data.ByteString.Lazy   as L
 import qualified Data.IntMap            as IntMap
+import qualified Data.HashMap.Strict    as HashMap
 import qualified Data.IntSet            as IntSet
 import qualified Data.Map               as Map
 import qualified Data.Sequence          as Seq
 import qualified Data.Set               as Set
 import qualified Data.Tree              as T
+import qualified Data.Vector            as Vector
+
 
 #if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative
@@ -406,6 +411,12 @@ putListOf pa = \l -> do
   mapM_ pa l
 {-# INLINE putListOf #-}
 
+putVectorOf :: Putter a -> Putter (Vector.Vector a)
+putVectorOf pa = \l -> do
+  putWord64be (fromIntegral (Vector.length l))
+  mapM_ pa l
+{-# INLINE putVectorOf #-}
+
 putIArrayOf :: (Ix i, IArray a e) => Putter i -> Putter e -> Putter (a i e)
 putIArrayOf pix pe a = do
   putTwoOf pix pix (bounds a)
@@ -432,6 +443,10 @@ putMapOf pk pa = putListOf (putTwoOf pk pa) . Map.toAscList
 putIntMapOf :: Putter Int -> Putter a -> Putter (IntMap.IntMap a)
 putIntMapOf pix pa = putListOf (putTwoOf pix pa) . IntMap.toAscList
 {-# INLINE putIntMapOf #-}
+
+putHashMapOf :: Putter k -> Putter a -> Putter (HashMap.HashMap k a)
+putHashMapOf pk pa = putListOf (putTwoOf pk pa) . HashMap.toList
+{-# INLINE putHashMapOf #-}
 
 putSetOf :: Putter a -> Putter (Set.Set a)
 putSetOf pa = putListOf pa . Set.toAscList

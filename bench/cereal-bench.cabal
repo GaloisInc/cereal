@@ -25,4 +25,10 @@ executable cereal-bench
                      , bytestring >= 0.9
                      , criterion
                      , binary     >= 0.5
+                     , text
+                     , unordered-containers
+                     , vector
+                     , hashable
+                     , scientific
                      , fail
+                     , time

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures
@@ -52,7 +53,16 @@ import Control.Monad
 import Data.Array.Unboxed
 import Data.ByteString (ByteString)
 import Data.Char    (chr,ord)
+import Data.Fixed   (Fixed(..))
+import Data.Hashable (Hashable)
 import Data.List    (unfoldr)
+import Data.Scientific (Scientific, floatingOrInteger, fromFloatDigits)
+import Data.Time
+import Data.Time.LocalTime
+import Data.Time.Calendar
+import Data.Text    (Text)
+import Data.Vector  (Vector)
+import qualified Data.Text.Encoding as Enc
 import Data.Word
 import Foreign
 
@@ -61,6 +71,7 @@ import qualified Data.ByteString       as B
 import qualified Data.ByteString.Lazy  as L
 import qualified Data.ByteString.Short as S
 import qualified Data.Map              as Map
+import qualified Data.HashMap.Strict   as HashMap
 import qualified Data.Monoid           as M
 import qualified Data.Set              as Set
 import qualified Data.IntMap           as IntMap
@@ -484,7 +495,7 @@ instance Serialize a => Serialize [a] where
 
 instance (Serialize a) => Serialize (Maybe a) where
     put = putMaybeOf put
-    get = getMaybeOf get
+    get = getMaybeOf' get -- use the `'` version of maybe to handle the end of buffer usecase.
 
 instance (Serialize a, Serialize b) => Serialize (Either a b) where
     put = putEitherOf put put
@@ -710,3 +721,59 @@ instance (SumSize a, SumSize b) => SumSize (a :+: b) where
 
 instance SumSize (C1 c a) where
     sumSize = Tagged 1
+
+------------------ Instances Added for Juspay usecase ------------------------------------------
+instance Serialize Text where
+  {-# INLINE put #-}
+  put t =
+    putNested (putWord32be . toEnum) (putByteString (Enc.encodeUtf8 t))
+  {-# INLINE get #-}
+  get = do
+    len <- fromEnum <$> getWord32be
+    Enc.decodeUtf8 <$> getBytes len
+
+instance (Eq k, Hashable k, Serialize k, Serialize e) => Serialize (HashMap.HashMap k e) where
+  put = putHashMapOf put put
+  get = getHashMapOf get get
+
+instance Serialize a => Serialize (Vector a) where
+  put =  putVectorOf put
+  get = getVectorOf get
+
+instance Serialize Scientific where
+  put x = do
+    put (floatingOrInteger x :: Either Double Int)
+  get = do
+    x <- get :: Get (Either Double Int)
+    pure $
+      case x of
+        Left f -> fromFloatDigits f
+        Right i -> fromIntegral i
+
+instance Serialize LocalTime where
+  put (LocalTime d tod) = do
+    put $ toModifiedJulianDay d
+    putByteString "D"
+    putInt8 $ fromIntegral $ todHour tod
+    putByteString "H"
+    putInt8 $ fromIntegral $ todMin tod
+    putByteString "M"
+    let MkFixed a = todSec tod
+    put a
+  get = do
+    day <- get
+    getBytes 1
+    hour <- fromEnum <$> getInt8
+    getBytes 1
+    min <- fromEnum <$> getInt8
+    getBytes 1
+    sec <- MkFixed <$> get
+    pure $ LocalTime (ModifiedJulianDay day) (TimeOfDay hour min sec)
+instance Serialize UTCTime where
+  put (UTCTime d tod) = do
+    put $ toModifiedJulianDay d
+    put $ diffTimeToPicoseconds tod
+  get = do
+    day <- get
+    d <- get
+    pure $ UTCTime (ModifiedJulianDay day) (picosecondsToDiffTime d)

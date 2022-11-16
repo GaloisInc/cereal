@@ -48,7 +48,7 @@ seqIntData = Seq.fromList . intData
 -- | Build a balanced binary tree.
 {-# NOINLINE treeIntData #-}
 treeIntData :: Int -> Tree Int
-treeIntData n = 
+treeIntData n =
    head $ go [0..n]  -- assuming n >= 0
   where
    go []  = []
@@ -63,7 +63,7 @@ treeIntData n =
 -------------
 
 main :: IO ()
-main = Criterion.Main.defaultMain $ 
+main = Criterion.Main.defaultMain $
     [ benchmarks "Tree Int memoized "  id         (treeIntData nRepl)
     , benchmarks "Seq Int memoized "   id         (seqIntData nRepl)
     , benchmarks "[Int] memoized "     id         (intData nRepl)

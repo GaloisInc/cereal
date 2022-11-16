@@ -1,14 +1,15 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 --------------------------------------------------------------------------------
 -- |
--- Module      : 
+-- Module      :
 -- Copyright   : (c) Galois, Inc, 2009
 -- License     : BSD3
 --
 -- Maintainer  : Trevor Elliott <trevor@galois.com>
--- Stability   : 
--- Portability : 
+-- Stability   :
+-- Portability :
 --
 module RoundTrip where
 
@@ -19,6 +20,10 @@ import Data.Serialize.IEEE754
 import Data.Word (Word8,Word16,Word32,Word64)
 import System.Exit (ExitCode(..), exitSuccess, exitWith)
 import Test.QuickCheck as QC
+import Data.Time
+import qualified Data.Aeson as A
+import qualified Data.HashMap.Strict as HM
+import Data.Cereal.Instances ()
 
 import Test.Framework (Test(),testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -57,7 +62,21 @@ tests  = testGroup "Round Trip"
     $ roundTrip (putListOf putWord8) (getListOf getWord8)
   , testProperty "Maybe Word8 Round Trip"
     $ roundTrip (putMaybeOf putWord8) (getMaybeOf getWord8)
+  , testProperty "Maybe without data"
+    $ runGet (getMaybeOf' getWord8) "" == Right Nothing
+  , testProperty "Maybe' Word8 Round Trip"
+    $ roundTrip (putMaybeOf putWord8) (getMaybeOf' getWord8)
   , testProperty "Either Word8 Word16be Round Trip "
     $ roundTrip (putEitherOf putWord8 putWord16be)
                 (getEitherOf getWord8 getWord16be)
+  , testProperty "Value with String Round Trip "
+    $ roundTrip put get (A.String "abc")
+  , testProperty "Value with Object Round Trip "
+    $ roundTrip put get (A.Object $ HM.insert "abc" (A.String "abc") HM.empty)
+  ]
+
+timeTests :: LocalTime -> UTCTime -> Test
+timeTests ltime utime = testGroup "simple time tests"
+  [ testProperty "Local Time"  $ roundTrip put get ltime
+  , testProperty "UTC Time" $ roundTrip put get utime
   ]
