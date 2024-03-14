@@ -34,7 +34,7 @@ module Data.Serialize.Get (
     , runGetLazyState
 
     -- ** Incremental interface
-    , Result(Fail, ..)
+    , Result(Fail, Partial, Done)
     , runGetPartial
     , runGetChunk
 
