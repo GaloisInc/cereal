@@ -128,7 +128,6 @@ import qualified Data.Tree                as T
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base
 import GHC.Word
-import Debug.Trace
 #endif
 
 -- | The result of a parse.
@@ -425,54 +424,64 @@ negativeIsolation = fail "Attempted to isolate a negative number of bytes"
 isolationUnderParse :: Get a
 isolationUnderParse =  fail "not all bytes parsed in isolate"
 
--- | Isolate an action to operating within a fixed block of bytes.  The action
---   is required to consume all the bytes that it is isolated to.
-isolate :: Int -> Get a -> Get a
-isolate 0 m = do
+isolationUnderSupply :: Get a
+isolationUnderSupply = failRaw "too few bytes" ["demandInput"]
+
+isolate0 :: Get a -> Get a
+isolate0 parser = do
   rest <- get
   cur <- bytesRead
   put mempty cur
-  a    <- m
+  a    <- parser
   put rest cur
   pure a
-isolate n m = do
-  M.when (n < 0) negativeIsolation
-  s <- ensure' n
-  let (s',rest) = B.splitAt n s
-  cur <- bytesRead
-  put s' cur
-  a    <- m
-  used <- get
-  unless (B.null used) isolationUnderParse
-  put rest (cur + n)
-  return a
+
+-- | Isolate an action to operating within a fixed block of bytes.  The action
+--   is required to consume all the bytes that it is isolated to.
+isolate :: Int -> Get a -> Get a
+isolate n m
+  | n < 0 = negativeIsolation
+  | n == 0 = isolate0 m
+  | otherwise = do
+      s <- ensure' n
+      let (s',rest) = B.splitAt n s
+      cur <- bytesRead
+      put s' cur
+      a    <- m
+      used <- get
+      unless (B.null used) isolationUnderParse
+      put rest (cur + n)
+      return a
 
 getAtMost :: Int -> Get B.ByteString
 getAtMost n = do
   (bs, rest) <- B.splitAt n <$> get
   curr <- bytesRead
-  unless (B.null rest) $ put rest (curr + B.length bs)
+  put rest (curr + B.length bs)
   pure bs
 
 -- | An incremental version of 'isolate', which doesn't try to read the input
 --   into a buffer all at once.
-isolateLazy :: forall a. Int -> Get a -> Get a
-isolateLazy n _ 
+isolateLazy :: Int -> Get a -> Get a
+isolateLazy n parser
   | n < 0 = negativeIsolation
+  | n == 0 = isolate0 parser
 isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
   where
     go :: Result a -> Get a
     go r = case r of
       FailRaw (msg, stack) bs -> bytesRead >>= put bs >> failRaw msg stack
       Done a bs
-        | not (B.null bs) -> isolationUnderParse
         | otherwise -> do
             bytesRead' <- bytesRead
-            unless (bytesRead' == n) isolationUnderParse
-            -- fail $ "mismatch " ++ show (bytesRead', n)
+            -- Technically this is both undersupply, and underparse
+            -- buyt we use undersupply to match strict isolation
+            unless (bytesRead' == n) isolationUnderSupply
+            unless (B.null bs) isolationUnderParse
             pure a
       Partial cont -> do
-        bs <- getAtMost . (n -) =<< bytesRead
+        pos <- bytesRead
+        bs <- getAtMost $ n - pos
         go $ cont bs
 
 failRaw :: String -> [String] -> Get a
@@ -488,7 +497,6 @@ skip n = do
   M.when (n < 0) (fail "Attempted to skip a negative number of bytes")
   s <- ensure' n
   cur <- bytesRead
-  -- traceShow (n, s, cur) $
   put (B.drop n s) (cur + n)
 
 -- | Skip ahead up to @n@ bytes in the current chunk. No error if there aren't

@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GetTests (tests) where
 
@@ -17,6 +18,7 @@ import           Test.HUnit (Assertion, (@=?), assertFailure)
 import           Test.QuickCheck hiding (Result)
 import qualified Test.QuickCheck as QC
 import Data.List (isInfixOf)
+import Debug.Trace
 
 
 -- Data to express Get parser to generate
@@ -127,10 +129,12 @@ isEmpty2 = do
   pure True
 
 -- Compare with chunks
-(==~) :: Eq a => Get a -> Get a -> Property
+(==~) :: (Eq a, Show a) => Get a -> Get a -> Property
 p1 ==~ p2 =
   conjoin
-  [ counterexample (show in0) $ R (runGetLazy p1 s) == R (runGetLazy p2 s)
+  [ let rl = runGetLazy p1 s
+        rr = runGetLazy p2 s
+    in counterexample (show (in0, n, s, rl, rr)) $ R rl == R rr
   | n <- [0 .. testLength]
   , let Chunks in0 = mkChunks n
         s = LB.fromChunks [ BS.pack c | c <- in0 ]
@@ -294,13 +298,28 @@ isolateLazyLeavesRemainingBytes = go (runGetPartial parser $ BS.replicate 11 0)
       Fail failure _ -> unless (failStr `isInfixOf` failure) $ assertFailure "Wrong error!"
       Partial cont -> assertFailure "Asked for more input!"
 
-isolateAndIsolateLazy :: Int -> GetD -> Property
-isolateAndIsolateLazy n parser' = isolate n parser ==~ isolateLazy n parser
+instance Arbitrary LB.ByteString where
+  arbitrary = LB.fromChunks . pure . BS.pack <$> arbitrary
+
+newtype IsolationRes a = IRes (Either String a)
+  deriving Show
+
+-- Sometimes lazy and strict isolations return different errors,
+-- eg. when EOF is called before the end of an isolation which isn't prodided
+-- enough input.
+-- Strict sees it as a lack of bytes, Lazy sees it as a guard failure ("empty").
+instance Eq a => Eq (IsolationRes a) where
+  IRes a == IRes b = case (a, b) of
+    (Left e1, Left e2) -> e1 == e2 || errsEqAsymmetric e1 e2 || errsEqAsymmetric e2 e1
+    _ -> a == b
+    where
+      errsEqAsymmetric e1 e2 = "too few bytes" `isInfixOf` e1 && "empty" `isInfixOf` e2
+
+isolateAndIsolateLazy :: Int -> GetD -> LB.ByteString -> Property
+isolateAndIsolateLazy n parser' bs
+  = IRes (runGetLazy (isolate n parser) bs) === IRes (runGetLazy (isolateLazy n parser) bs)
   where
     parser = buildGet parser'
-
--- isolateLazyLeavesRemainingBytesAfterSuccess :: Assertion
--- isolateLazyLeavesRemainingBytesAfterSuccess = go
 
 isolateIsNotIncremental :: Assertion
 isolateIsNotIncremental = go (runGetPartial parser $ BS.replicate 11 0)
