@@ -39,6 +39,7 @@ module Data.Serialize.Get (
     -- * Parsing
     , ensure
     , isolate
+    , isolateLazy
     , label
     , skip
     , uncheckedSkip
@@ -408,6 +409,9 @@ ensure' n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
                     in ks s b m0 w0 s
                 else getMore n' s0 ss b0 m0 w0 kf ks
 
+negativeIsolation :: Get a
+negativeIsolation = fail "Attempted to isolate a negative number of bytes"
+
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
 isolate :: Int -> Get a -> Get a
@@ -419,7 +423,7 @@ isolate 0 m = do
   put rest cur
   pure a
 isolate n m = do
-  M.when (n < 0) (fail "Attempted to isolate a negative number of bytes")
+  M.when (n < 0) negativeIsolation
   s <- ensure' n
   let (s',rest) = B.splitAt n s
   cur <- bytesRead
@@ -429,6 +433,35 @@ isolate n m = do
   unless (B.null used) (fail "not all bytes parsed in isolate")
   put rest (cur + n)
   return a
+
+getAtMost :: Int -> Get B.ByteString
+getAtMost n = do
+  (bs, rest) <- B.splitAt n <$> get
+  m <- bytesRead
+  unless (B.null rest) $ put rest (m - B.length rest)
+  pure bs
+
+-- | An incremental version of 'isolate', which doesn't try to read the input
+--   into a buffer all at once.
+isolateLazy :: forall a. Int -> Get a -> Get a
+isolateLazy n _ 
+  | n < 0 = negativeIsolation
+isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
+  where
+    go :: Result a -> Get a
+    go r = case r of
+      Fail err bs -> bytesRead >>= put bs >> fail err
+      Done a bs
+        | not (B.null bs) -> throwDidntParseEnough
+        | otherwise -> do
+            bytesRead' <- bytesRead
+            unless (bytesRead' == n) throwDidntParseEnough
+            pure a
+      Partial cont -> do
+        bs <- getAtMost . (n -) =<< bytesRead
+        go $ cont bs
+
+    throwDidntParseEnough = fail "Not all bytes parsed in isolateLazy"
 
 failDesc :: String -> Get a
 failDesc err = do
