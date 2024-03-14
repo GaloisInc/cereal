@@ -364,12 +364,15 @@ runGetLazyState m lstr = case runGetLazy' m lstr of
 
 -- | If at least @n@ bytes of input are available, return the current
 --   input, otherwise fail.
-{-# INLINE ensure #-}
 ensure :: Int -> Get B.ByteString
-ensure n0
-  | n0 < 0 = fail "Attempted to ensure negative amount of bytes"
-  | n0 == 0 = pure mempty
-  | otherwise = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
+ensure n
+  | n < 0 = fail "Attempted to ensure negative amount of bytes"
+  | n == 0 = pure mempty
+  | otherwise = ensure' n
+
+{-# INLINE ensure #-}
+ensure' :: Int -> Get B.ByteString
+ensure' n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
     n' = n0 - B.length s0
     in if n' <= 0
         then ks s0 b0 m0 w0 s0
@@ -408,9 +411,16 @@ ensure n0
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
 isolate :: Int -> Get a -> Get a
+isolate 0 m = do
+  rest <- get
+  cur <- bytesRead
+  put mempty cur
+  a    <- m
+  put rest cur
+  pure a
 isolate n m = do
   M.when (n < 0) (fail "Attempted to isolate a negative number of bytes")
-  s <- ensure n
+  s <- ensure' n
   let (s',rest) = B.splitAt n s
   cur <- bytesRead
   put s' cur
@@ -427,8 +437,10 @@ failDesc err = do
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
+skip 0 = pure ()
 skip n = do
-  s <- ensure n
+  M.when (n < 0) (fail "Attempted to skip a negative number of bytes")
+  s <- ensure' n
   cur <- bytesRead
   put (B.drop n s) (cur + n)
 
@@ -523,15 +535,17 @@ getShortByteString n = do
 
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
-getBytes n | n < 0 = fail "getBytes: negative length requested"
-getBytes n = do
-    s <- ensure n
-    let consume = B.unsafeTake n s
-        rest    = B.unsafeDrop n s
-        -- (consume,rest) = B.splitAt n s
-    cur <- bytesRead
-    put rest (cur + n)
-    return consume
+getBytes n
+  | n < 0 = fail "getBytes: negative length requested"
+  | n == 0 = pure mempty
+  | otherwise = do
+      s <- ensure' n
+      let consume = B.unsafeTake n s
+          rest    = B.unsafeDrop n s
+          -- (consume,rest) = B.splitAt n s
+      cur <- bytesRead
+      put rest (cur + n)
+      return consume
 {-# INLINE getBytes #-}
 
 
