@@ -2,6 +2,8 @@
 {-# LANGUAGE MagicHash  #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,7 +34,7 @@ module Data.Serialize.Get (
     , runGetLazyState
 
     -- ** Incremental interface
-    , Result(..)
+    , Result(Fail, ..)
     , runGetPartial
     , runGetChunk
 
@@ -126,10 +128,11 @@ import qualified Data.Tree                as T
 #if defined(__GLASGOW_HASKELL__) && !defined(__HADDOCK__)
 import GHC.Base
 import GHC.Word
+import Debug.Trace
 #endif
 
 -- | The result of a parse.
-data Result r = Fail String B.ByteString
+data Result r = FailRaw (String, [String]) B.ByteString
               -- ^ The parse failed. The 'String' is the
               --   message describing the error, if any.
               | Partial (B.ByteString -> Result r)
@@ -141,13 +144,20 @@ data Result r = Fail String B.ByteString
               --   input that had not yet been consumed (if any) when
               --   the parse succeeded.
 
+pattern Fail :: String -> B.ByteString -> Result r
+pattern Fail msg bs <- FailRaw (formatFailure -> msg) bs
+{-# COMPLETE Fail, Partial, Done #-}
+
+formatFailure :: (String, [String]) -> String
+formatFailure (err, stack) = unlines [err, formatTrace stack]
+
 instance Show r => Show (Result r) where
-    show (Fail msg _) = "Fail " ++ show msg
+    show (FailRaw msg _) = "Fail " ++ show msg
     show (Partial _)  = "Partial _"
     show (Done r bs)  = "Done " ++ show r ++ " " ++ show bs
 
 instance Functor Result where
-    fmap _ (Fail msg rest) = Fail msg rest
+    fmap _ (FailRaw a bs) = FailRaw a bs
     fmap f (Partial k)     = Partial (fmap f . k)
     fmap f (Done r bs)     = Done (f r) bs
 
@@ -276,7 +286,7 @@ finalK s _ _ _ a = Done a s
 
 failK :: Failure a
 failK s b _ ls msg =
-  Fail (unlines [msg, formatTrace ls]) (s `B.append` bufferBytes b)
+  FailRaw (msg, ls) (s `B.append` bufferBytes b)
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
@@ -440,8 +450,8 @@ isolate n m = do
 getAtMost :: Int -> Get B.ByteString
 getAtMost n = do
   (bs, rest) <- B.splitAt n <$> get
-  m <- bytesRead
-  unless (B.null rest) $ put rest (m - B.length rest)
+  curr <- bytesRead
+  unless (B.null rest) $ put rest (curr + B.length bs)
   pure bs
 
 -- | An incremental version of 'isolate', which doesn't try to read the input
@@ -453,22 +463,23 @@ isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
   where
     go :: Result a -> Get a
     go r = case r of
-      Fail err bs -> bytesRead >>= put bs >> failRaw err
+      FailRaw (msg, stack) bs -> bytesRead >>= put bs >> failRaw msg stack
       Done a bs
         | not (B.null bs) -> isolationUnderParse
         | otherwise -> do
             bytesRead' <- bytesRead
             unless (bytesRead' == n) isolationUnderParse
+            -- fail $ "mismatch " ++ show (bytesRead', n)
             pure a
       Partial cont -> do
         bs <- getAtMost . (n -) =<< bytesRead
         go $ cont bs
 
-failRaw :: String -> Get a
-failRaw msg = Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 [] msg)
+failRaw :: String -> [String] -> Get a
+failRaw msg stack = Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 stack msg)
 
 failDesc :: String -> Get a
-failDesc err = failRaw $ "Failed reading: " ++ err
+failDesc err = failRaw ("Failed reading: " ++ err) []
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
@@ -477,6 +488,7 @@ skip n = do
   M.when (n < 0) (fail "Attempted to skip a negative number of bytes")
   s <- ensure' n
   cur <- bytesRead
+  -- traceShow (n, s, cur) $
   put (B.drop n s) (cur + n)
 
 -- | Skip ahead up to @n@ bytes in the current chunk. No error if there aren't
