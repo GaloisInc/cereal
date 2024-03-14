@@ -12,7 +12,11 @@ import qualified Data.ByteString.Lazy as LB
 import           Data.Serialize.Get
 import           Test.Framework (Test(),testGroup)
 import           Test.Framework.Providers.QuickCheck2 (testProperty)
-import           Test.QuickCheck as QC
+import           Test.Framework.Providers.HUnit (testCase)
+import           Test.HUnit (Assertion, (@=?), assertFailure)
+import           Test.QuickCheck hiding (Result)
+import qualified Test.QuickCheck as QC
+import Data.List (isInfixOf)
 
 
 -- Data to express Get parser to generate
@@ -254,6 +258,68 @@ alterDistr' p1 p2 p3 =
     y = buildGet p2
     z = buildGet p3
 
+isolateLazyIsIncremental :: Assertion
+isolateLazyIsIncremental = go (runGetPartial parser $ BS.replicate 11 0)
+  where
+    parser :: Get ()
+    parser = isolateLazy 100 $ do
+      skip 10
+      fail failStr
+      pure ()
+
+    failStr :: String
+    failStr = "no thanks"
+
+    go :: Result () -> IO ()
+    go r = case r of
+      Done () _ -> assertFailure "Impossible"
+      Fail failure _ -> unless (failStr `isInfixOf` failure) $ assertFailure "Wrong error!"
+      Partial cont -> assertFailure "Asked for more input!"
+
+isolateLazyLeavesRemainingBytes :: Assertion
+isolateLazyLeavesRemainingBytes = go (runGetPartial parser $ BS.replicate 11 0)
+  where
+    parser :: Get ()
+    parser = isolateLazy 100 $ do
+      skip 10
+      fail failStr
+      pure ()
+
+    failStr :: String
+    failStr = "no thanks"
+
+    go :: Result () -> IO ()
+    go r = case r of
+      Done () _ -> assertFailure "Impossible"
+      Fail failure _ -> unless (failStr `isInfixOf` failure) $ assertFailure "Wrong error!"
+      Partial cont -> assertFailure "Asked for more input!"
+
+isolateAndIsolateLazy :: Int -> GetD -> Property
+isolateAndIsolateLazy n parser' = isolate n parser ==~ isolateLazy n parser
+  where
+    parser = buildGet parser'
+
+-- isolateLazyLeavesRemainingBytesAfterSuccess :: Assertion
+-- isolateLazyLeavesRemainingBytesAfterSuccess = go
+
+isolateIsNotIncremental :: Assertion
+isolateIsNotIncremental = go (runGetPartial parser $ BS.replicate 11 0)
+  where
+    parser :: Get ()
+    parser = isolate 100 $ do
+      skip 10
+      fail failStr
+      pure ()
+
+    failStr :: String
+    failStr = "no thanks"
+
+    go :: Result () -> IO ()
+    go r = case r of
+      Done () _ -> assertFailure "Impossible"
+      Fail failure _ -> assertFailure $ "Strict isolate was incremental: " <> failure
+      Partial cont -> pure ()
+
 
 tests :: Test
 tests  = testGroup "GetTests"
@@ -275,4 +341,7 @@ tests  = testGroup "GetTests"
   , testProperty "strict - alternative assoc"      alterAssoc'
   , testProperty "lazy   - alternative distr"      alterDistr
   , testProperty "strict - alternative distr"      alterDistr'
+  , testCase     "isolate is not incremental"      isolateIsNotIncremental
+  , testCase     "isolateLazy is incremental"      isolateLazyIsIncremental
+  , testProperty "isolations are equivalent"       isolateAndIsolateLazy
   ]

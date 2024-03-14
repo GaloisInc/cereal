@@ -450,7 +450,7 @@ isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
   where
     go :: Result a -> Get a
     go r = case r of
-      Fail err bs -> bytesRead >>= put bs >> fail err
+      Fail err bs -> bytesRead >>= put bs >> failRaw err
       Done a bs
         | not (B.null bs) -> throwDidntParseEnough
         | otherwise -> do
@@ -461,12 +461,13 @@ isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
         bs <- getAtMost . (n -) =<< bytesRead
         go $ cont bs
 
-    throwDidntParseEnough = fail "Not all bytes parsed in isolateLazy"
+    throwDidntParseEnough = fail "not all bytes parsed in isolate"
+
+failRaw :: String -> Get a
+failRaw msg = Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 [] msg)
 
 failDesc :: String -> Get a
-failDesc err = do
-    let msg = "Failed reading: " ++ err
-    Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 [] msg)
+failDesc err = failRaw $ "Failed reading: " ++ err
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
