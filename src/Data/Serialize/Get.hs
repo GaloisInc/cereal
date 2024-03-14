@@ -366,7 +366,10 @@ runGetLazyState m lstr = case runGetLazy' m lstr of
 --   input, otherwise fail.
 {-# INLINE ensure #-}
 ensure :: Int -> Get B.ByteString
-ensure n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
+ensure n0
+  | n0 < 0 = fail "Attempted to ensure negative amount of bytes"
+  | n0 == 0 = pure mempty
+  | otherwise = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
     n' = n0 - B.length s0
     in if n' <= 0
         then ks s0 b0 m0 w0 s0
