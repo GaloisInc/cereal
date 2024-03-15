@@ -355,8 +355,8 @@ isolateLazyDeterminesLeftovers :: Assertion
 isolateLazyDeterminesLeftovers = do
   assertResultsMatch (runGetPartial (isolateLazy 1 getWord8) "123") (Just $ toEnum $ fromEnum '1', "23")
   assertResultsMatch (runGetPartial (isolateLazy 2 getWord8) "123") (Nothing, "3")
-  -- I don't think this is the right behaviour, but it's the existing behaviour, so
-  -- we're checking we're consistent
+  -- Note(414owen): I don't think this is the ideal behaviour, but it's the existing behaviour, so
+  -- I'll at least check that isolateLazy matches the behaviour of isolate...
   assertResultsMatch (runGetPartial (isolate 2 $ fail "no thanks" *> pure ()) "123") (Nothing, "12")
   assertResultsMatch (runGetPartial (isolateLazy 2 $ fail "no thanks" *> pure ()) "123") (Nothing, "12")
 

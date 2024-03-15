@@ -482,7 +482,14 @@ isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
       Partial cont -> do
         pos <- bytesRead
         bs <- getAtMost $ n - pos
-        go $ cont bs
+        -- We want to give the inner parser a chance to determine
+        -- output, but if it returns a continuation, we'll throw
+        -- instead of recursing indefinitely
+        if B.null bs
+          then case cont bs of
+            Partial cont -> isolationUnderSupply
+            a -> go a
+          else go $ cont bs
 
 failRaw :: String -> [String] -> Get a
 failRaw msg stack = Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 stack msg)
