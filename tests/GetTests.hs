@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module GetTests (tests) where
 
@@ -339,6 +340,25 @@ isolateIsNotIncremental = go (runGetPartial parser $ BS.replicate 11 0)
       Fail failure _ -> assertFailure $ "Strict isolate was incremental: " <> failure
       Partial cont -> pure ()
 
+-- Checks return values, leftovers, fails for continuations
+assertResultsMatch :: Eq a => Result a -> (Maybe a, BS.ByteString) -> Assertion
+assertResultsMatch r1 r2 = case (r1, r2) of
+  (Partial _, _) -> assertFailure "Continuation received"
+  (Done a1 bs1, (Just a2, bs2)) -> do
+    unless (a1 == a2) $ assertFailure "Result mismatch"
+    unless (bs1 == bs2) $ assertFailure $ "Success leftover mismatch: " ++ show (bs1, bs2)
+  (Fail msg1 bs1, (Nothing, bs2)) ->
+    unless (bs1 == bs2) $ assertFailure $ "Failure leftovers mismatch: " ++ show (bs1, bs2)
+  _ -> assertFailure "Different result types"
+
+isolateLazyDeterminesLeftovers :: Assertion
+isolateLazyDeterminesLeftovers = do
+  assertResultsMatch (runGetPartial (isolateLazy 1 getWord8) "123") (Just $ toEnum $ fromEnum '1', "23")
+  assertResultsMatch (runGetPartial (isolateLazy 2 getWord8) "123") (Nothing, "3")
+  -- I don't think this is the right behaviour, but it's the existing behaviour, so
+  -- we're checking we're consistent
+  assertResultsMatch (runGetPartial (isolate 2 $ fail "no thanks" *> pure ()) "123") (Nothing, "12")
+  assertResultsMatch (runGetPartial (isolateLazy 2 $ fail "no thanks" *> pure ()) "123") (Nothing, "12")
 
 tests :: Test
 tests  = testGroup "GetTests"
@@ -363,4 +383,5 @@ tests  = testGroup "GetTests"
   , testCase     "isolate is not incremental"      isolateIsNotIncremental
   , testCase     "isolateLazy is incremental"      isolateLazyIsIncremental
   , testProperty "isolations are equivalent"       isolateAndIsolateLazy
+  , testCase     "isolateLazy determines leftovers" isolateLazyDeterminesLeftovers
   ]
