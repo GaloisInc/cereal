@@ -455,7 +455,7 @@ isolate n m
 
 getAtMost :: Int -> Get B.ByteString
 getAtMost n = do
-  (bs, rest) <- B.splitAt n <$> get
+  (bs, rest) <- B.splitAt n <$> ensure' 1
   curr <- bytesRead
   put rest (curr + B.length bs)
   pure bs
