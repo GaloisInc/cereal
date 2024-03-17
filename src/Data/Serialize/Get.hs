@@ -466,30 +466,32 @@ isolateLazy :: Int -> Get a -> Get a
 isolateLazy n parser
   | n < 0 = negativeIsolation
   | n == 0 = isolate0 parser
-isolateLazy n parser = go . runGetPartial parser =<< getAtMost n
+isolateLazy n parser = do
+  initialBytesRead <- bytesRead
+  go initialBytesRead . runGetPartial parser =<< getAtMost n
   where
-    go :: Result a -> Get a
-    go r = case r of
+    go :: Int -> Result a -> Get a
+    go initialBytesRead r = case r of
       FailRaw (msg, stack) bs -> bytesRead >>= put bs >> failRaw msg stack
       Done a bs
         | otherwise -> do
             bytesRead' <- bytesRead
             -- Technically this is both undersupply, and underparse
             -- buyt we use undersupply to match strict isolation
-            unless (bytesRead' == n) isolationUnderSupply
+            unless (bytesRead' - initialBytesRead == n) isolationUnderSupply
             unless (B.null bs) isolationUnderParse
             pure a
       Partial cont -> do
         pos <- bytesRead
-        bs <- getAtMost $ n - pos
+        bs <- getAtMost $ n - (pos - initialBytesRead)
         -- We want to give the inner parser a chance to determine
         -- output, but if it returns a continuation, we'll throw
         -- instead of recursing indefinitely
         if B.null bs
           then case cont bs of
             Partial cont -> isolationUnderSupply
-            a -> go a
-          else go $ cont bs
+            a -> go initialBytesRead a
+          else go initialBytesRead $ cont bs
 
 failRaw :: String -> [String] -> Get a
 failRaw msg stack = Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 stack msg)
