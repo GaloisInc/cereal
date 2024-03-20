@@ -66,8 +66,10 @@ test-suite test-cereal
 
         build-depends:          base == 4.*,
                                 bytestring >= 0.9,
+                                HUnit,
                                 QuickCheck,
                                 test-framework,
+                                test-framework-hunit,
                                 test-framework-quickcheck2,
                                 cereal
 
