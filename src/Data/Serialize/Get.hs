@@ -476,8 +476,8 @@ isolateLazy n parser = do
       Done a bs
         | otherwise -> do
             bytesRead' <- bytesRead
-            -- Technically this is both undersupply, and underparse
-            -- buyt we use undersupply to match strict isolation
+            -- Technically this matches both undersupply, and underparse
+            -- but we throw undersupply to match strict isolation
             unless (bytesRead' - initialBytesRead == n) isolationUnderSupply
             unless (B.null bs) isolationUnderParse
             pure a
