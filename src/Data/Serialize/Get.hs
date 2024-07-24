@@ -2,6 +2,8 @@
 {-# LANGUAGE MagicHash  #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,13 +34,14 @@ module Data.Serialize.Get (
     , runGetLazyState
 
     -- ** Incremental interface
-    , Result(..)
+    , Result(Fail, Partial, Done)
     , runGetPartial
     , runGetChunk
 
     -- * Parsing
     , ensure
     , isolate
+    , isolateLazy
     , label
     , skip
     , uncheckedSkip
@@ -128,7 +131,7 @@ import GHC.Word
 #endif
 
 -- | The result of a parse.
-data Result r = Fail String B.ByteString
+data Result r = FailRaw (String, [String]) B.ByteString
               -- ^ The parse failed. The 'String' is the
               --   message describing the error, if any.
               | Partial (B.ByteString -> Result r)
@@ -140,13 +143,20 @@ data Result r = Fail String B.ByteString
               --   input that had not yet been consumed (if any) when
               --   the parse succeeded.
 
+pattern Fail :: String -> B.ByteString -> Result r
+pattern Fail msg bs <- FailRaw (formatFailure -> msg) bs
+{-# COMPLETE Fail, Partial, Done #-}
+
+formatFailure :: (String, [String]) -> String
+formatFailure (err, stack) = unlines [err, formatTrace stack]
+
 instance Show r => Show (Result r) where
-    show (Fail msg _) = "Fail " ++ show msg
+    show (FailRaw msg _) = "Fail " ++ show msg
     show (Partial _)  = "Partial _"
     show (Done r bs)  = "Done " ++ show r ++ " " ++ show bs
 
 instance Functor Result where
-    fmap _ (Fail msg rest) = Fail msg rest
+    fmap _ (FailRaw a bs) = FailRaw a bs
     fmap f (Partial k)     = Partial (fmap f . k)
     fmap f (Done r bs)     = Done (f r) bs
 
@@ -275,7 +285,7 @@ finalK s _ _ _ a = Done a s
 
 failK :: Failure a
 failK s b _ ls msg =
-  Fail (unlines [msg, formatTrace ls]) (s `B.append` bufferBytes b)
+  FailRaw (msg, ls) (s `B.append` bufferBytes b)
 
 -- | Run the Get monad applies a 'get'-based parser on the input ByteString
 runGet :: Get a -> B.ByteString -> Either String a
@@ -364,9 +374,14 @@ runGetLazyState m lstr = case runGetLazy' m lstr of
 
 -- | If at least @n@ bytes of input are available, return the current
 --   input, otherwise fail.
-{-# INLINE ensure #-}
 ensure :: Int -> Get B.ByteString
-ensure n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
+ensure n
+  | n < 0 = fail "Attempted to ensure negative amount of bytes"
+  | otherwise = ensure' n
+
+{-# INLINE ensure #-}
+ensure' :: Int -> Get B.ByteString
+ensure' n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
     n' = n0 - B.length s0
     in if n' <= 0
         then ks s0 b0 m0 w0 s0
@@ -402,30 +417,83 @@ ensure n0 = n0 `seq` Get $ \ s0 b0 m0 w0 kf ks -> let
                     in ks s b m0 w0 s
                 else getMore n' s0 ss b0 m0 w0 kf ks
 
+negativeIsolation :: Get a
+negativeIsolation = fail "Attempted to isolate a negative number of bytes"
+
+isolationUnderParse :: Get a
+isolationUnderParse = fail "Isolated parser didn't consume all input"
+
+isolationUnderSupply :: Get a
+isolationUnderSupply = fail "Too few bytes supplied to isolated parser"
+
 -- | Isolate an action to operating within a fixed block of bytes.  The action
 --   is required to consume all the bytes that it is isolated to.
 isolate :: Int -> Get a -> Get a
-isolate n m = do
-  M.when (n < 0) (fail "Attempted to isolate a negative number of bytes")
-  s <- ensure n
-  let (s',rest) = B.splitAt n s
-  cur <- bytesRead
-  put s' cur
-  a    <- m
-  used <- get
-  unless (B.null used) (fail "not all bytes parsed in isolate")
-  put rest (cur + n)
-  return a
+isolate n m
+  | n < 0 = negativeIsolation
+  | otherwise = do
+      s <- ensure' n
+      let (s',rest) = B.splitAt n s
+      cur <- bytesRead
+      put s' cur
+      a    <- m
+      used <- get
+      unless (B.null used) isolationUnderParse
+      put rest (cur + n)
+      return a
+
+getAtMost :: Int -> Get B.ByteString
+getAtMost 0 = pure mempty
+getAtMost n = do
+  (bs, rest) <- B.splitAt n <$> ensure' 1
+  curr <- bytesRead
+  put rest (curr + B.length bs)
+  pure bs
+
+-- | An incremental version of 'isolate', which doesn't try to read the input
+--   into a buffer all at once.
+isolateLazy :: Int -> Get a -> Get a
+isolateLazy n _ | n < 0 = negativeIsolation
+isolateLazy n parser = do
+  initialBytesRead <- bytesRead
+  bs <- getAtMost n
+  go initialBytesRead $ runGetPartial parser bs
+  where
+    go :: Int -> Result a -> Get a
+    go initialBytesRead r = case r of
+      FailRaw (msg, stack) bs -> do
+        m <- bytesRead
+        put bs m
+        failRaw msg stack
+      Done a bs -> do
+        bytesRead' <- bytesRead
+        unless (bytesRead' - initialBytesRead == n && B.null bs)
+          $ fail $ "Isolated parser didn't consume all input. "
+            <> "Internal leftovers: " <> show bs
+            <> ", bytesRead: " <> show (bytesRead' - initialBytesRead)
+            <> ", isolation amt: " <> show n
+        pure a
+      Partial cont -> do
+        pos <- bytesRead
+        let bytesLeft = n - (pos - initialBytesRead)
+        if bytesLeft == 0
+          then isolationUnderSupply
+          else do
+            bs <- getAtMost bytesLeft
+            go initialBytesRead $ cont bs
+
+failRaw :: String -> [String] -> Get a
+failRaw msg stack = Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 stack msg)
 
 failDesc :: String -> Get a
-failDesc err = do
-    let msg = "Failed reading: " ++ err
-    Get (\s0 b0 m0 _ kf _ -> kf s0 b0 m0 [] msg)
+failDesc err = failRaw ("Failed reading: " ++ err) []
 
 -- | Skip ahead @n@ bytes. Fails if fewer than @n@ bytes are available.
 skip :: Int -> Get ()
+skip 0 = pure ()
 skip n = do
-  s <- ensure n
+  M.when (n < 0) (fail "Attempted to skip a negative number of bytes")
+  s <- ensure' n
   cur <- bytesRead
   put (B.drop n s) (cur + n)
 
@@ -520,15 +588,16 @@ getShortByteString n = do
 
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
-getBytes n | n < 0 = fail "getBytes: negative length requested"
-getBytes n = do
-    s <- ensure n
-    let consume = B.unsafeTake n s
-        rest    = B.unsafeDrop n s
-        -- (consume,rest) = B.splitAt n s
-    cur <- bytesRead
-    put rest (cur + n)
-    return consume
+getBytes n
+  | n < 0 = fail "getBytes: negative length requested"
+  | otherwise = do
+      s <- ensure' n
+      let consume = B.unsafeTake n s
+          rest    = B.unsafeDrop n s
+          -- (consume,rest) = B.splitAt n s
+      cur <- bytesRead
+      put rest (cur + n)
+      return consume
 {-# INLINE getBytes #-}
 
 
