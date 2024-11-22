@@ -52,6 +52,7 @@ import Control.Monad
 import Data.Array.Unboxed
 import Data.ByteString (ByteString)
 import Data.Char    (chr,ord)
+import Data.Kind    (Type)
 import Data.List    (unfoldr)
 import Data.Word
 import Foreign
@@ -702,7 +703,7 @@ instance GSerializeGet a => GetSum (C1 c a) where
 class SumSize f where
     sumSize :: Tagged f Word64
 
-newtype Tagged (s :: * -> *) b = Tagged {unTagged :: b}
+newtype Tagged (s :: Type -> Type) b = Tagged {unTagged :: b}
 
 instance (SumSize a, SumSize b) => SumSize (a :+: b) where
     sumSize = Tagged $ unTagged (sumSize :: Tagged a Word64) +
